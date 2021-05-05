@@ -3,7 +3,7 @@
 	"tasks": [
 		{
 			"type": "shell",
-			"command": "cargo watch -x 'run -- serve'",
+			"command": "cargo watch -x 'run -- fetch'",
 			"group": "build",
 			"problemMatcher": [],
 			"options": {
