@@ -1,0 +1,114 @@
+name: Release
+
+on: 
+  push:
+    tags:
+    - '*'
+
+jobs:
+  build:
+    runs-on: "${{ matrix.os }}"
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: .exe
+    steps:
+      - uses: actions/checkout@master
+        with:
+          lfs: true
+      - id: get_repository_name
+        run: echo ::set-output name=REPOSITORY_NAME::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
+        shell: bash
+      - uses: actions/cache@v2.1.5
+        name: Cache cargo dependencies
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            .cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        env:
+          REPOSITORY_NAME: "${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}"
+        with:
+          command: build
+          args: "--release"
+      - uses: actions/upload-artifact@master
+        with:
+          path: ./target/release/${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}${{ matrix.suffix }}
+          name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+      - if: ${{ matrix.os != 'windows-latest' }}
+        run: cp ./target/release/${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}${{ matrix.suffix }} ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+      - if: ${{ matrix.os == 'windows-latest' }}
+        run: copy .\target\release\${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}${{ matrix.suffix }} ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+      - uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+
+  build-cross:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - armv7-unknown-linux-gnueabihf
+          - arm-unknown-linux-gnueabi
+    steps:
+      - uses: actions/checkout@master
+        with:
+          lfs: true
+      - id: get_repository_name
+        run: echo ::set-output name=REPOSITORY_NAME::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
+        shell: bash
+      - uses: actions/cache@v2.1.5
+        name: Cache cargo dependencies
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            .cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        env:
+          REPOSITORY_NAME: "${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}"
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@master
+        with:
+          path: ./target/${{ matrix.target }}/release/${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}${{ matrix.suffix }}
+          name: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+      - env:
+          BUILD_PATH: ./target/${{ matrix.target }}/release/${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}${{ matrix.suffix }}
+          RELEASE_PATH: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+        run: cp $BUILD_PATH $RELEASE_PATH
+      - uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ${{ steps.get_repository_name.outputs.REPOSITORY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
