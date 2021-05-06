@@ -11,7 +11,7 @@
 					"RUST_LOG": "debug"
 				}
 			},
-			"label": "Rust: cargo watch - telnet-gateway-menu"
+			"label": "Rust: cargo watch"
 		},
 		{
 			"type": "cargo",
@@ -20,7 +20,7 @@
 				"$rustc"
 			],
 			"group": "build",
-			"label": "Rust: cargo run - telnet-gateway-menu"
+			"label": "Rust: cargo run"
 		},
 		{
 			"type": "cargo",
@@ -29,7 +29,7 @@
 				"$rustc"
 			],
 			"group": "build",
-			"label": "Rust: cargo build - telnet-gateway-menu"
+			"label": "Rust: cargo build"
 		},
 		{
 			"type": "cargo",
@@ -38,7 +38,7 @@
 				"$rustc"
 			],
 			"group": "build",
-			"label": "Rust: cargo check - telnet-gateway-menu"
+			"label": "Rust: cargo check"
 		},
 		{
 			"type": "cargo",
@@ -47,7 +47,7 @@
 				"$rustc"
 			],
 			"group": "build",
-			"label": "Rust: cargo test - telnet-gateway-menu"
+			"label": "Rust: cargo test"
 		},
 		{
 			"type": "cargo",
@@ -56,7 +56,7 @@
 				"$rustc"
 			],
 			"group": "build",
-			"label": "Rust: cargo clean - telnet-gateway-menu"
+			"label": "Rust: cargo clean"
 		}
 	]
 }
