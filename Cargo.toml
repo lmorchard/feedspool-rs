@@ -29,6 +29,7 @@ toml = "0.5"
 xml-rs = "0.8.3"
 futures = "0.3.14"
 chrono = "0.4.19"
+sha2 = "0.9.4"
 
 [lib]
 name = "feedspool"

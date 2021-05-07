@@ -1,11 +1,13 @@
 CREATE TABLE feeds (
   id TEXT PRIMARY KEY,
+  published TEXT,
   created_at TEXT,
   updated_at TEXT,
   url TEXT,
   title TEXT,
   subtitle TEXT,
-  link TEXT
+  link TEXT,
+  json TEXT
 );
 
 CREATE TABLE feed_history (
@@ -21,6 +23,7 @@ CREATE TABLE feed_history (
 CREATE TABLE entries (
   id TEXT PRIMARY KEY,
   feed_id TEXT,
+  published TEXT,
   created_at TEXT,
   updated_at TEXT,
   defunct BOOLEAN,

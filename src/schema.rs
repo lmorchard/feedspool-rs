@@ -2,6 +2,7 @@ table! {
     entries (id) {
         id -> Nullable<Text>,
         feed_id -> Nullable<Text>,
+        published -> Nullable<Text>,
         created_at -> Nullable<Text>,
         updated_at -> Nullable<Text>,
         defunct -> Nullable<Bool>,
@@ -29,17 +30,15 @@ table! {
 table! {
     feeds (id) {
         id -> Nullable<Text>,
+        published -> Nullable<Text>,
         created_at -> Nullable<Text>,
         updated_at -> Nullable<Text>,
         url -> Nullable<Text>,
         title -> Nullable<Text>,
         subtitle -> Nullable<Text>,
         link -> Nullable<Text>,
+        json -> Nullable<Text>,
     }
 }
 
-allow_tables_to_appear_in_same_query!(
-    entries,
-    feed_history,
-    feeds,
-);
+allow_tables_to_appear_in_same_query!(entries, feed_history, feeds,);
