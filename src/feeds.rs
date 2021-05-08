@@ -1,3 +1,5 @@
+#![allow(clippy::match_wildcard_for_single_variants)]
+
 use chrono::prelude::*;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
@@ -15,7 +17,12 @@ pub async fn poll_one_feed(
     conn: &SqliteConnection,
     url: &str,
     request_timeout: Duration,
+    min_fetch_period: Duration,
 ) -> Result<FetchedFeed, Box<dyn Error>> {
+    if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
+        log::trace!("Skipped fetch for {} - min fetch period", &url);
+        return Ok(FetchedFeed::skipped(&url));
+    }
     let last_get_conditions = find_last_get_conditions(&conn, &url);
     let fetched_feed = fetch_feed(url, request_timeout, last_get_conditions).await?;
     record_feed_history(&conn, &fetched_feed)?;
@@ -29,14 +36,46 @@ fn feed_id_from_url(url: &str) -> String {
     format!("{:x}", Sha256::new().chain(url).finalize())
 }
 
+fn was_feed_recently_fetched(
+    conn: &SqliteConnection,
+    url: &str,
+    min_fetch_period: Duration,
+) -> Result<bool, Box<dyn Error>> {
+    let now = Utc::now();
+    let last_fetch_time = find_last_fetch_time(&conn, &url);
+    if let Some(last_fetch_time) = last_fetch_time {
+        if let Ok(last_fetch_time) = chrono::DateTime::parse_from_rfc3339(&last_fetch_time) {
+            if now < last_fetch_time + chrono::Duration::from_std(min_fetch_period)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+// TODO: Add a status enum field indicating whether this was fetched, skipped, or resulted in error
 #[derive(Debug)]
 pub struct FetchedFeed {
-    id: String,
-    url: String,
-    status: String,
-    body: String,
-    headers: reqwest::header::HeaderMap,
-    feed: Option<Feed>,
+    pub id: String,
+    pub url: String,
+    pub status: Option<String>,
+    pub body: Option<String>,
+    pub headers: Option<reqwest::header::HeaderMap>,
+    pub feed: Option<Feed>,
+}
+
+impl FetchedFeed {
+    #[must_use]
+    pub fn skipped(url: &str) -> Self {
+        Self {
+            id: feed_id_from_url(&url),
+            url: String::from(url),
+            status: None,
+            headers: None,
+            body: None,
+            feed: None,
+        }
+    }
 }
 
 async fn fetch_feed(
@@ -66,9 +105,9 @@ async fn fetch_feed(
     Ok(FetchedFeed {
         id: feed_id_from_url(&url),
         url: String::from(url),
-        status: String::from(status.as_str()),
-        headers,
-        body,
+        status: Some(String::from(status.as_str())),
+        headers: Some(headers),
+        body: Some(body),
         feed,
     })
 }
@@ -160,7 +199,7 @@ fn record_feed_history(
     fetched_feed: &FetchedFeed,
 ) -> Result<(), Box<dyn Error>> {
     let now = Utc::now().to_rfc3339();
-    let headers = &fetched_feed.headers;
+    let headers = &fetched_feed.headers.as_ref().unwrap();
     let feed_id = &fetched_feed.id;
     let history_id = &format!("{:x}", Sha256::new().chain(&feed_id).chain(&now).finalize());
     {
@@ -170,8 +209,8 @@ fn record_feed_history(
             .values(models::FeedHistoryNew {
                 feed_id,
                 id: history_id,
-                src: &fetched_feed.body,
-                status: &fetched_feed.status,
+                src: &fetched_feed.body.as_ref().unwrap(),
+                status: &fetched_feed.status.as_ref().unwrap(),
                 etag: header_or_blank(&headers, reqwest::header::ETAG),
                 last_modified: header_or_blank(&headers, reqwest::header::LAST_MODIFIED),
                 created_at: &now,
@@ -201,6 +240,20 @@ fn find_last_get_conditions(conn: &SqliteConnection, feed_url: &str) -> Option<C
             etag,
             last_modified,
         }),
+        _ => None,
+    }
+}
+
+fn find_last_fetch_time(conn: &SqliteConnection, feed_url: &str) -> Option<String> {
+    use crate::schema::feed_history;
+    let feed_id = feed_id_from_url(feed_url);
+    match feed_history::table
+        .filter(feed_history::dsl::feed_id.eq(feed_id))
+        .order(feed_history::dsl::created_at.desc())
+        .select(feed_history::dsl::created_at)
+        .first::<Option<String>>(conn)
+    {
+        Ok(last_fetch_time) => last_fetch_time,
         _ => None,
     }
 }
