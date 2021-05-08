@@ -44,7 +44,11 @@ pub async fn execute(
     let fut = stream::iter(feeds).for_each_concurrent(concurrency_limit, |url| async move {
         log::info!("Fetching feed {}", &url);
         let conn = establish_connection();
-        poll_one_feed(&conn, url, request_timeout).await
+        if let Err(err) = poll_one_feed(&conn, url, request_timeout).await {
+            log::error!("Error polling feed {} - {}", url, err);
+        } else {
+            log::info!("Updated feed {}", &url);
+        }
     });
     fut.await;
     log::info!("ALL DONE!");

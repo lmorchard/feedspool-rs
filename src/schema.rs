@@ -43,4 +43,8 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(entries, feed_history, feeds,);
+allow_tables_to_appear_in_same_query!(
+    entries,
+    feed_history,
+    feeds,
+);
