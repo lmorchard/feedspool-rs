@@ -116,7 +116,7 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
-build:
+  build:
     needs:
       - lints
       - test

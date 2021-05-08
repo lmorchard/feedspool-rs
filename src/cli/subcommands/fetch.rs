@@ -6,13 +6,7 @@ use std::time::Duration;
 use clap::{App, ArgMatches};
 use futures::stream::{self, StreamExt};
 
-use dotenv::dotenv;
-use std::env;
-
-use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
-
-use feedspool::feeds::poll_one_feed;
+use feedspool::{db, feeds};
 
 pub const NAME: &str = "fetch";
 
@@ -22,7 +16,7 @@ pub fn app() -> App<'static> {
 
 pub async fn execute(
     _matches: &ArgMatches,
-    _config: &config::Config,
+    config: &config::Config,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let concurrency_limit = 4;
     let request_timeout = Duration::from_secs(5);
@@ -39,26 +33,20 @@ pub async fn execute(
         "https://blog.lmorchard.com/index.rss",
     ];
 
-    println!("Hello, world!");
-
     let fut = stream::iter(feeds).for_each_concurrent(concurrency_limit, |url| async move {
         log::info!("Fetching feed {}", &url);
-        let conn = establish_connection();
-        if let Err(err) = poll_one_feed(&conn, url, request_timeout).await {
-            log::error!("Error polling feed {} - {}", url, err);
-        } else {
-            log::info!("Updated feed {}", &url);
+        let conn_try = db::connect(&config);
+        if let Err(err) = conn_try {
+            log::error!("Error connection to DB - {}", err);
+        } else if let Ok(conn) = conn_try {
+            if let Err(err) = feeds::poll_one_feed(&conn, url, request_timeout).await {
+                log::error!("Error polling feed {} - {}", url, err);
+            } else {
+                log::info!("Updated feed {}", &url);
+            }
         }
     });
     fut.await;
     log::info!("ALL DONE!");
     Ok(())
-}
-
-fn establish_connection() -> SqliteConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }

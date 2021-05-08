@@ -26,6 +26,7 @@ fn app() -> App<'static> {
         .arg(
             Arg::new("debug")
                 .short('d')
+                .long("debug")
                 .about("Turn debugging information on"),
         )
 }

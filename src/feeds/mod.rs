@@ -7,9 +7,9 @@ use sha2::{Digest, Sha256};
 use std::time::Duration;
 
 /// # Errors
-/// 
+///
 /// Will return Err for any failure while polling a feed
-/// TODO: actually inventory and document the errors here 
+/// TODO: actually inventory and document the errors here
 pub async fn poll_one_feed(
     conn: &SqliteConnection,
     url: &str,
