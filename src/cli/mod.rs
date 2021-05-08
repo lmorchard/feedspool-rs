@@ -1,20 +1,17 @@
-use clap::ArgMatches;
 use clap::{crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg};
+use std::error::Error;
 
 pub mod config;
 pub mod logging;
 pub mod subcommands;
 
-// TODO: no idea what I'm going with these lifetimes
-pub fn setup() -> App<'static> {
-    subcommands::setup(app())
-}
-
-pub async fn execute(
-    config: &::config::Config,
-    app_m: ArgMatches,
-) -> Result<(), Box<dyn std::error::Error>> {
-    subcommands::execute(&config, app_m).await
+pub async fn execute() -> Result<(), Box<dyn Error>> {
+    let app = subcommands::setup(app());
+    let app_m = app.get_matches();
+    let config = config::setup(&app_m).unwrap();
+    logging::setup(&config).unwrap();
+    subcommands::execute(&config, app_m).await?;
+    Ok(())
 }
 
 fn app() -> App<'static> {

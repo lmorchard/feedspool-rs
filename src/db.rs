@@ -1,13 +1,14 @@
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::embed_migrations;
+use std::error::Error;
 
 embed_migrations!("migrations");
 
 /// # Errors
 ///
 /// Will return Err for any problem in connection to database
-pub fn setup(config: &config::Config) -> Result<SqliteConnection, Box<dyn std::error::Error>> {
+pub fn setup(config: &config::Config) -> Result<SqliteConnection, Box<dyn Error>> {
     let debug = config.get_bool("debug")?;
     let conn = connect(config)?;
     if debug {
@@ -21,7 +22,7 @@ pub fn setup(config: &config::Config) -> Result<SqliteConnection, Box<dyn std::e
 /// # Errors
 ///
 /// Will return Err for any problem in connection to database
-pub fn connect(config: &config::Config) -> Result<SqliteConnection, Box<dyn std::error::Error>> {
+pub fn connect(config: &config::Config) -> Result<SqliteConnection, Box<dyn Error>> {
     let database_url = &config.get_str("database_url")?;
     Ok(SqliteConnection::establish(&database_url)?)
 }

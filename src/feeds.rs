@@ -4,6 +4,7 @@ use diesel::sqlite::SqliteConnection;
 use feed_rs::model::{Entry, Feed};
 use feed_rs::parser;
 use sha2::{Digest, Sha256};
+use std::error::Error;
 use std::time::Duration;
 
 /// # Errors
@@ -14,7 +15,7 @@ pub async fn poll_one_feed(
     conn: &SqliteConnection,
     url: &str,
     request_timeout: Duration,
-) -> Result<FetchedFeed, Box<dyn std::error::Error>> {
+) -> Result<FetchedFeed, Box<dyn Error>> {
     let last_get_conditions = find_last_get_conditions(&conn, &url);
     let fetched_feed = fetch_feed(url, request_timeout, last_get_conditions).await?;
     record_feed_history(&conn, &fetched_feed)?;
@@ -42,7 +43,7 @@ async fn fetch_feed(
     url: &str,
     timeout_duration: Duration,
     last_get_conditions: Option<ConditionalGetData>,
-) -> Result<FetchedFeed, Box<dyn std::error::Error>> {
+) -> Result<FetchedFeed, Box<dyn Error>> {
     let mut request = reqwest::Client::new().get(url).timeout(timeout_duration);
     if let Some(last_get_conditions) = last_get_conditions {
         if let Some(etag) = last_get_conditions.etag {
@@ -72,10 +73,7 @@ async fn fetch_feed(
     })
 }
 
-fn update_feed(
-    conn: &SqliteConnection,
-    fetched_feed: &FetchedFeed,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn update_feed(conn: &SqliteConnection, fetched_feed: &FetchedFeed) -> Result<(), Box<dyn Error>> {
     let now = Utc::now();
 
     let feed = &fetched_feed.feed.as_ref().unwrap();
@@ -160,7 +158,7 @@ fn header_or_blank(
 fn record_feed_history(
     conn: &SqliteConnection,
     fetched_feed: &FetchedFeed,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     let now = Utc::now().to_rfc3339();
     let headers = &fetched_feed.headers;
     let feed_id = &fetched_feed.id;
@@ -211,7 +209,7 @@ fn update_entry(
     conn: &SqliteConnection,
     parent_feed_id: &str,
     entry: &Entry,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     let now = Utc::now();
 
     let mut entry_published = String::from(&now.to_rfc3339());

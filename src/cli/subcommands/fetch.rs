@@ -1,5 +1,6 @@
 extern crate dotenv;
 
+use std::error::Error;
 use std::str;
 use std::time::Duration;
 
@@ -14,10 +15,7 @@ pub fn app() -> App<'static> {
     App::new(NAME).about("Fetch a feed")
 }
 
-pub async fn execute(
-    _matches: &ArgMatches,
-    config: &config::Config,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(), Box<dyn Error>> {
     let concurrency_limit = 4;
     let request_timeout = Duration::from_secs(5);
 
@@ -28,8 +26,8 @@ pub async fn execute(
         "http://www.slate.com/rss/",
         "http://www.theverge.com/rss/index.xml",
         "http://www.wired.com/news/feeds/rss2/0,2610,,00.xml",
-        "yomama",
-        "http://farts.yolo/",
+        //"yomama",
+        //"http://farts.yolo/",
         "https://blog.lmorchard.com/index.rss",
     ];
 
