@@ -142,18 +142,16 @@ jobs:
       - id: get_repository_name
         run: echo ::set-output name=REPOSITORY_NAME::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
         shell: bash
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2.1.5
+        name: Cache cargo
         with:
-          path: ~/.cargo/registry
-          key: "${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}"
-      - uses: actions/cache@v1
-        with:
-          path: ~/.cargo/git
-          key: "${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}"
-      - uses: actions/cache@v1
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            .cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
