@@ -2,7 +2,7 @@
 
 Feeds on the web need periodic polling. This aims to be a tool for doing that and accumulating the result in a SQLite database for use by other tools.
 
-## TODO
+## To Do
 
 * OPML import / export
 

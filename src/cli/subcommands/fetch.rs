@@ -1,5 +1,3 @@
-extern crate dotenv;
-
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -10,6 +8,7 @@ use std::time::Duration;
 use clap::{App, ArgMatches};
 use futures::stream::{self, StreamExt};
 
+use feedspool::feeds::{FeedPollResult, FeedPollError};
 use feedspool::{db, feeds};
 
 pub const NAME: &str = "fetch";
@@ -20,7 +19,7 @@ pub fn app() -> App<'static> {
 
 pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(), Box<dyn Error>> {
     let concurrency_limit = 32;
-    let min_fetch_period = Duration::from_secs(60 * 30);
+    let min_fetch_period = Duration::from_secs(5); //60 * 30);
     let request_timeout = Duration::from_secs(5);
 
     /*
@@ -41,7 +40,7 @@ pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(
         let fut =
             stream::iter(feeds).for_each_concurrent(concurrency_limit, |url_try| async move {
                 if let Ok(url) = url_try {
-                    log::info!("Fetching feed {}", &url);
+                    log::info!("Fetching {}", &url);
                     let conn_try = db::connect(&config);
                     if let Err(err) = conn_try {
                         log::error!("Error connection to DB - {}", err);
@@ -49,14 +48,36 @@ pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(
                         match feeds::poll_one_feed(&conn, &url, request_timeout, min_fetch_period)
                             .await
                         {
-                            Err(err) => log::error!("Error polling feed {} - {}", url, err),
-                            Ok(fetched_feed) => {
-                                if fetched_feed.feed.is_some() {
-                                    log::info!("Updated feed {}", &url);
-                                } else {
-                                    log::info!("Skipped feed {}", &url);
+                            Ok(fetch_result) => match fetch_result {
+                                FeedPollResult::Skipped { .. } => {
+                                    log::info!("Skipped update for {}", url)
                                 }
-                            }
+                                FeedPollResult::NotModified { .. } => {
+                                    log::info!("No updates for {}", url)
+                                }
+                                FeedPollResult::Updated { .. } => {
+                                    log::info!("Updated {}", url)
+                                }
+                                _ => log::info!("Unexpected result {} {:?}", url, fetch_result),
+                            },
+                            Err(error) => match error {
+                                FeedPollError::FetchFailed { status, .. } => {
+                                    log::error!("Fetch failed with status {} for {}", status, url)
+                                },
+                                FeedPollError::NotFound { .. } => {
+                                    log::error!("Not found error for {}", url)
+                                },
+                                FeedPollError::Timedout { .. } => {
+                                    log::error!("Fetch timed out for {}", url)
+                                },
+                                FeedPollError::ParseError { error, .. } => {
+                                    log::error!("Feed parsing failed for {} - {:?}", url, error)
+                                }
+                                FeedPollError::UpdateError { error, .. } => {
+                                    log::error!("Databse update failed for {} - {:?}", url, error)
+                                }
+                                _ => log::error!("Error polling feed {} - {:?}", url, error),
+                            },
                         }
                     }
                 }

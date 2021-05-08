@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use config::Config;
 use std::error::Error;
 
-// TODO: this function seems awkward
+// TODO: config::setup() function seems awkward
 pub fn setup(app_m: &ArgMatches) -> Result<config::Config, Box<dyn Error>> {
     // TODO: just chaining straight from Config::default() raises complaints of temporary references, why?
     let mut config_default = Config::default();
