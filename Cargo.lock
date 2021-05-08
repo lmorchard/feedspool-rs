@@ -319,7 +319,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "feedspool"
+name = "feedspool-rs"
 version = "0.1.0"
 dependencies = [
  "chrono",

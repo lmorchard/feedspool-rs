@@ -5,7 +5,7 @@ description = "A utility for regularly fetching feeds from the web"
 edition = "2018"
 keywords = ["rss", "feeds"]
 license = "MIT"
-name = "feedspool"
+name = "feedspool-rs"
 repository = "https://github.com/lmorchard/feedspool-rs/"
 version = "0.1.0"
 
