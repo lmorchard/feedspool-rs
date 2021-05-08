@@ -4,10 +4,10 @@ version = "0.1.0"
 description = "A utility for regularly fetching feeds from the web"
 authors = ["Les Orchard <me@lmorchard.com>"]
 edition = "2018"
-repository = "https://github.com/lmorchard/telnet-gateway-menu/"
+repository = "https://github.com/lmorchard/feedspool-rs/"
 license = "MIT"
 categories = [ "command-line-interface", "command-line-utilities" ]
-keywords = [ "telnet", "bbs" ]
+keywords = [ "rss", "feeds" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

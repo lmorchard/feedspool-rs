@@ -23,7 +23,9 @@ table! {
         updated_at -> Nullable<Text>,
         src -> Nullable<Text>,
         status -> Nullable<Text>,
-        status_text -> Nullable<Text>,
+        etag -> Nullable<Text>,
+        last_modified -> Nullable<Text>,
+        json -> Nullable<Text>,
     }
 }
 

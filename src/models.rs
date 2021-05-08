@@ -60,6 +60,8 @@ pub struct FeedHistoryNew<'a> {
     pub created_at: &'a str,
     pub src: &'a str,
     pub status: &'a str,
+    pub etag: &'a str,
+    pub last_modified: &'a str,
 }
 
 #[derive(Queryable)]
