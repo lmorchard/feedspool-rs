@@ -1,7 +1,12 @@
-use exitfailure::ExitFailure;
-
+#[macro_use]
+extern crate diesel_migrations;
 extern crate clap;
 extern crate config;
+
+use diesel_migrations::embed_migrations;
+use exitfailure::ExitFailure;
+
+embed_migrations!("migrations");
 
 mod cli;
 

@@ -16,6 +16,7 @@ chrono = "0.4.19"
 clap = "3.0.0-beta.2"
 config = "0.11"
 diesel = {version = "1.4.6", features = ["sqlite", "chrono"]}
+diesel_migrations = "1.4.0"
 dotenv = "0.15.0"
 env_logger = "0.8"
 exitfailure = "0.5.1"

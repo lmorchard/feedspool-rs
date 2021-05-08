@@ -6,6 +6,10 @@ use feed_rs::parser;
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
+/// # Errors
+/// 
+/// Will return Err for any failure while polling a feed
+/// TODO: actually inventory and document the errors here 
 pub async fn poll_one_feed(
     conn: &SqliteConnection,
     url: &str,
@@ -21,7 +25,7 @@ pub async fn poll_one_feed(
 }
 
 fn feed_id_from_url(url: &str) -> String {
-    String::from(format!("{:x}", Sha256::new().chain(url).finalize()))
+    format!("{:x}", Sha256::new().chain(url).finalize())
 }
 
 #[derive(Debug)]
@@ -68,7 +72,7 @@ async fn fetch_feed(
     })
 }
 
-pub fn update_feed(
+fn update_feed(
     conn: &SqliteConnection,
     fetched_feed: &FetchedFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -98,7 +102,7 @@ pub fn update_feed(
 
     {
         use crate::models;
-        use crate::schema::feeds::dsl::*;
+        use crate::schema::feeds::dsl::{feeds, id};
 
         let feed_exists = feeds
             .filter(id.eq(&feed_id))
@@ -153,7 +157,7 @@ fn header_or_blank(
     ""
 }
 
-pub fn record_feed_history(
+fn record_feed_history(
     conn: &SqliteConnection,
     fetched_feed: &FetchedFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -186,7 +190,7 @@ struct ConditionalGetData {
 }
 
 fn find_last_get_conditions(conn: &SqliteConnection, feed_url: &str) -> Option<ConditionalGetData> {
-    use crate::schema::*;
+    use crate::schema::feed_history;
     let feed_id = feed_id_from_url(feed_url);
     match feed_history::table
         .filter(feed_history::dsl::feed_id.eq(feed_id))
@@ -250,7 +254,7 @@ fn update_entry(
 
     {
         use crate::models;
-        use crate::schema::entries::dsl::*;
+        use crate::schema::entries::dsl::{entries, feed_id, id};
 
         let entry_exists = entries
             .filter(id.eq(&entry_id))

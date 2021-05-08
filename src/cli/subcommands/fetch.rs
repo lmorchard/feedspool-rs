@@ -12,7 +12,7 @@ use std::env;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 
-use feedspool::feeds::*;
+use feedspool::feeds::poll_one_feed;
 
 pub const NAME: &str = "fetch";
 
