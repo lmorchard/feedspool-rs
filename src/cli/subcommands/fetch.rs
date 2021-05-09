@@ -8,7 +8,7 @@ use std::time::Duration;
 use clap::{App, ArgMatches};
 use futures::stream::{self, StreamExt};
 
-use feedspool::feeds::{FeedPollError, FeedPollResult};
+use feedspool::feeds::result::{FeedPollError, FeedPollResult};
 use feedspool::{db, feeds};
 
 pub const NAME: &str = "fetch";
