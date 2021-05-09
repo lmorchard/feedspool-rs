@@ -1,5 +1,7 @@
 # feedspool
 
+![Github Actions badge](https://github.com/lmorchard/feedspool-rs/actions/workflows/test.yml/badge.svg)
+
 Feeds on the web need periodic polling. This aims to be a tool for doing that and accumulating the result in a SQLite database for use by other tools.
 
 ## To Do
