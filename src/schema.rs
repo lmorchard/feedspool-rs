@@ -26,6 +26,8 @@ table! {
         etag -> Nullable<Text>,
         last_modified -> Nullable<Text>,
         json -> Nullable<Text>,
+        is_error -> Nullable<Bool>,
+        error_text -> Nullable<Text>,
     }
 }
 

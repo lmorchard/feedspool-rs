@@ -49,12 +49,13 @@ pub struct FeedHistory {
     pub updated_at: String,
     pub src: String,
     pub status: String,
-    pub status_text: String,
+    pub is_error: bool,
+    pub error_text: String,
 }
 
 #[derive(Insertable)]
 #[table_name = "feed_history"]
-pub struct FeedHistoryNew<'a> {
+pub struct FeedHistoryNewSuccess<'a> {
     pub id: &'a str,
     pub feed_id: &'a str,
     pub created_at: &'a str,
@@ -62,6 +63,16 @@ pub struct FeedHistoryNew<'a> {
     pub status: &'a str,
     pub etag: &'a str,
     pub last_modified: &'a str,
+}
+
+#[derive(Insertable)]
+#[table_name = "feed_history"]
+pub struct FeedHistoryNewError<'a> {
+    pub id: &'a str,
+    pub feed_id: &'a str,
+    pub created_at: &'a str,
+    pub is_error: bool,
+    pub error_text: &'a str,
 }
 
 #[derive(Queryable)]

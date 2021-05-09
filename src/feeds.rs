@@ -13,93 +13,42 @@ use std::panic;
 use std::time::Duration;
 
 #[derive(Debug)]
+pub struct FeedFetchResult {
+    pub id: String,
+    pub url: String,
+    pub status: String,
+    pub headers: reqwest::header::HeaderMap,
+    pub body: String,
+}
+
+#[derive(Debug)]
 pub enum FeedPollResult {
-    Skipped {
-        id: String,
-        url: String,
-    },
-    Fetched {
-        id: String,
-        url: String,
-        status: String,
-        body: String,
-        headers: reqwest::header::HeaderMap,
-        feed: Feed,
-    },
-    NotModified {
-        id: String,
-        url: String,
-        status: String,
-        body: String,
-        headers: reqwest::header::HeaderMap,
-    },
-    Updated {
-        id: String,
-        url: String,
-        status: String,
-        body: String,
-        headers: reqwest::header::HeaderMap,
-        feed: Feed,
-    },
+    Skipped,
+    NotModified { fetch: FeedFetchResult },
+    Fetched { fetch: FeedFetchResult, feed: Feed },
+    Updated { fetch: FeedFetchResult, feed: Feed },
 }
 
 impl FeedPollResult {
-    #[must_use]
-    pub fn skipped(url: &str) -> FeedPollResult {
-        Self::Skipped {
-            id: feed_id_from_url(&url),
-            url: String::from(url),
-        }
-    }
-
     /// # Panics
-    /// 
+    ///
     /// Will panic if attempted on something other than `FeedPollResult::Fetched`
     #[must_use]
     pub fn fetched_to_updated(self) -> FeedPollResult {
         match self {
-            Self::Fetched {
-                id,
-                url,
-                status,
-                body,
-                headers,
-                feed,
-            } => Self::Updated {
-                id,
-                url,
-                status,
-                body,
-                headers,
-                feed,
-            },
+            Self::Fetched { fetch, feed } => Self::Updated { fetch, feed },
             // TODO: find a non-panic way to handle this?
             _ => panic!("fetched_to_updated {:?}", &self),
         }
     }
 
     /// # Panics
-    /// 
+    ///
     /// Will panic if attempted on something other than `FeedPollResult::Fetched`
     #[must_use]
     pub fn fetched_to_update_error(self, error: diesel::result::Error) -> FeedPollError {
         match self {
-            Self::Fetched {
-                id,
-                url,
-                status,
-                body,
-                headers,
-                feed,
-            } => FeedPollError::UpdateError {
-                id,
-                url,
-                status,
-                body,
-                headers,
-                feed,
-                error,
-            },
+            Self::Fetched { fetch, feed } => FeedPollError::UpdateError { fetch, feed, error },
             // TODO: find a non-panic way to handle this?
             _ => panic!("fetched_to_update_error {:?}", self),
         }
@@ -109,42 +58,19 @@ impl FeedPollResult {
 #[derive(Debug)]
 pub enum FeedPollError {
     FetchTimeError(time::OutOfRangeError),
-    Timedout {
-        id: String,
-        url: String,
-        error: reqwest::Error,
-    },
-    NotFound {
-        id: String,
-        url: String,
-        error: reqwest::Error,
-    },
-    FetchError {
-        id: String,
-        url: String,
-        error: reqwest::Error,
-    },
+    Timedout(reqwest::Error),
+    NotFound(reqwest::Error),
+    FetchError(reqwest::Error),
+    DatabaseError(diesel::result::Error),
     FetchFailed {
-        id: String,
-        url: String,
-        status: String,
-        body: String,
-        headers: reqwest::header::HeaderMap,
+        fetch: FeedFetchResult,
     },
     ParseError {
-        id: String,
-        url: String,
-        status: String,
-        body: String,
-        headers: reqwest::header::HeaderMap,
+        fetch: FeedFetchResult,
         error: feed_rs::parser::ParseFeedError,
     },
     UpdateError {
-        id: String,
-        url: String,
-        status: String,
-        body: String,
-        headers: reqwest::header::HeaderMap,
+        fetch: FeedFetchResult,
         feed: Feed,
         error: diesel::result::Error,
     },
@@ -161,8 +87,25 @@ impl Error for FeedPollError {}
 /// # Errors
 ///
 /// Will return Err for any failure while polling a feed
-/// TODO: actually inventory and document the errors here
 pub async fn poll_one_feed(
+    conn: &SqliteConnection,
+    url: &str,
+    request_timeout: Duration,
+    min_fetch_period: Duration,
+) -> Result<FeedPollResult, FeedPollError> {
+    match _poll_one_feed(conn, url, request_timeout, min_fetch_period).await {
+        Ok(fetch_result) => {
+            record_feed_history_success(&conn, &fetch_result)?;
+            Ok(fetch_result)
+        }
+        Err(error) => {
+            record_feed_history_error(&conn, &url, &error)?;
+            Err(error)
+        }
+    }
+}
+
+async fn _poll_one_feed(
     conn: &SqliteConnection,
     url: &str,
     request_timeout: Duration,
@@ -170,13 +113,11 @@ pub async fn poll_one_feed(
 ) -> Result<FeedPollResult, FeedPollError> {
     if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
         log::trace!("Skipped fetch for {} - min fetch period", &url);
-        return Ok(FeedPollResult::skipped(&url));
+        return Ok(FeedPollResult::Skipped);
     }
     let last_get_conditions = find_last_get_conditions(&conn, &url);
-    // TODO: Catch error from fetch and record in history before returning
     let mut fetch_result = fetch_feed(url, request_timeout, last_get_conditions).await?;
     fetch_result = update_feed(&conn, fetch_result)?;
-    fetch_result = record_feed_history(&conn, fetch_result)?;
     Ok(fetch_result)
 }
 
@@ -220,67 +161,48 @@ async fn fetch_feed(
         }
     }
 
-    let id = feed_id_from_url(&url);
-    let url = String::from(url);
-
-    // TODO: impl4ement some convenience constructors to shorten up some of these results
     match request.send().await {
         Err(error) => {
             if error.is_timeout() {
-                Err(FeedPollError::Timedout { id, url, error })
+                Err(FeedPollError::Timedout(error))
             } else if error.is_status() && error.status().unwrap() == reqwest::StatusCode::NOT_FOUND
             {
-                Err(FeedPollError::NotFound { id, url, error })
+                Err(FeedPollError::NotFound(error))
             } else {
-                Err(FeedPollError::FetchError { id, url, error })
+                Err(FeedPollError::FetchError(error))
             }
         }
         Ok(response) => {
             let response_status = response.status();
-            let status = String::from(response_status.as_str());
             let headers = response.headers().clone();
-            match response.text().await {
+            let body = response.text().await;
+            match body {
                 Err(error) => {
                     if error.is_timeout() {
-                        Err(FeedPollError::Timedout { id, url, error })
+                        Err(FeedPollError::Timedout(error))
                     } else {
-                        Err(FeedPollError::FetchError { id, url, error })
+                        Err(FeedPollError::FetchError(error))
                     }
                 }
-                Ok(body) => match response_status {
-                    reqwest::StatusCode::OK => match parser::parse(body.as_bytes()) {
-                        Err(error) => Err(FeedPollError::ParseError {
-                            id,
-                            url,
-                            status,
-                            headers,
-                            body,
-                            error,
-                        }),
-                        Ok(feed) => Ok(FeedPollResult::Fetched {
-                            feed,
-                            id,
-                            url,
-                            status,
-                            headers,
-                            body,
-                        }),
-                    },
-                    reqwest::StatusCode::NOT_MODIFIED => Ok(FeedPollResult::NotModified {
-                        id,
-                        url,
-                        status,
+                Ok(body) => {
+                    let fetch = FeedFetchResult {
+                        id: feed_id_from_url(&url),
+                        url: String::from(url),
+                        status: String::from(response_status.as_str()),
                         headers,
                         body,
-                    }),
-                    _ => Err(FeedPollError::FetchFailed {
-                        id,
-                        url,
-                        status,
-                        headers,
-                        body,
-                    }),
-                },
+                    };
+                    match response_status {
+                        reqwest::StatusCode::OK => match parser::parse(fetch.body.as_bytes()) {
+                            Err(error) => Err(FeedPollError::ParseError { fetch, error }),
+                            Ok(feed) => Ok(FeedPollResult::Fetched { fetch, feed }),
+                        },
+                        reqwest::StatusCode::NOT_MODIFIED => {
+                            Ok(FeedPollResult::NotModified { fetch })
+                        }
+                        _ => Err(FeedPollError::FetchFailed { fetch }),
+                    }
+                }
             }
         }
     }
@@ -291,15 +213,8 @@ fn update_feed(
     fetch_result: FeedPollResult,
 ) -> Result<FeedPollResult, FeedPollError> {
     match &fetch_result {
-        FeedPollResult::Fetched {
-            feed,
-            id: feed_id,
-            url: feed_url,
-            ..
-        } => {
+        FeedPollResult::Fetched { feed, fetch, .. } => {
             let now = Utc::now();
-
-            let feed_url = feed_url.as_str();
 
             let mut feed_published = String::from(&now.to_rfc3339());
             if let Some(published_date) = feed.published {
@@ -322,8 +237,8 @@ fn update_feed(
             if let Err(error) = upsert_feed(
                 &conn,
                 &now,
-                &feed_id,
-                &feed_url,
+                &fetch.id,
+                &fetch.url,
                 &feed_title,
                 &feed_link,
                 &feed_published,
@@ -331,7 +246,7 @@ fn update_feed(
                 return Err(fetch_result.fetched_to_update_error(error));
             }
             for entry in &feed.entries {
-                if let Err(error) = update_entry(&conn, &feed_id, &entry) {
+                if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
                     return Err(fetch_result.fetched_to_update_error(error));
                 }
             }
@@ -401,57 +316,72 @@ fn header_or_blank(
     ""
 }
 
-fn record_feed_history(
+fn record_feed_history_success(
     conn: &SqliteConnection,
-    fetch_result: FeedPollResult,
-) -> Result<FeedPollResult, FeedPollError> {
+    fetch_result: &FeedPollResult,
+) -> Result<(), FeedPollError> {
     match &fetch_result {
-        FeedPollResult::Fetched {
-            id,
-            status,
-            headers,
-            body,
-            ..
+        FeedPollResult::Updated { fetch, .. } | FeedPollResult::NotModified { fetch, .. } => {
+            insert_feed_history(&conn, &fetch)?;
+            Ok(())
         }
-        | FeedPollResult::Updated {
-            id,
-            status,
-            headers,
-            body,
-            ..
-        } => {
-            if let Err(error) = insert_feed_history(&conn, &id, &status, &headers, &body) {
-                return Err(fetch_result.fetched_to_update_error(error));
-            }
-            Ok(fetch_result)
-        }
-        _ => Ok(fetch_result),
+        _ => Ok(()),
     }
 }
 
 fn insert_feed_history(
     conn: &SqliteConnection,
-    feed_id: &str,
-    status: &str,
-    headers: &reqwest::header::HeaderMap,
-    body: &str,
-) -> Result<(), diesel::result::Error> {
+    fetch: &FeedFetchResult,
+) -> Result<(), FeedPollError> {
     let now = Utc::now().to_rfc3339();
+    let history_id = &format!(
+        "{:x}",
+        Sha256::new().chain(&fetch.id).chain(&now).finalize()
+    );
+    {
+        use crate::models;
+        use crate::schema::feed_history;
+        if let Err(db_error) = diesel::insert_into(feed_history::table)
+            .values(models::FeedHistoryNewSuccess {
+                id: history_id,
+                feed_id: &fetch.id,
+                src: &fetch.body,
+                status: &fetch.status,
+                etag: header_or_blank(&fetch.headers, reqwest::header::ETAG),
+                last_modified: header_or_blank(&fetch.headers, reqwest::header::LAST_MODIFIED),
+                created_at: &now,
+            })
+            .execute(conn)
+        {
+            return Err(FeedPollError::DatabaseError(db_error));
+        }
+    }
+    Ok(())
+}
+
+fn record_feed_history_error(
+    conn: &SqliteConnection,
+    url: &str,
+    error: &FeedPollError,
+) -> Result<(), FeedPollError> {
+    let now = Utc::now().to_rfc3339();
+    let feed_id = feed_id_from_url(&url);
     let history_id = &format!("{:x}", Sha256::new().chain(&feed_id).chain(&now).finalize());
     {
         use crate::models;
         use crate::schema::feed_history;
-        diesel::insert_into(feed_history::table)
-            .values(models::FeedHistoryNew {
-                feed_id,
+        if let Err(db_error) = diesel::insert_into(feed_history::table)
+            .values(models::FeedHistoryNewError {
                 id: history_id,
-                src: &body,
-                status: &status,
-                etag: header_or_blank(&headers, reqwest::header::ETAG),
-                last_modified: header_or_blank(&headers, reqwest::header::LAST_MODIFIED),
+                feed_id: &feed_id,
                 created_at: &now,
+                is_error: true,
+                error_text: format!("{:?}", &error).as_str(),
             })
-            .execute(conn)?;
+            .execute(conn)
+        {
+            return Err(FeedPollError::DatabaseError(db_error));
+        }
     }
     Ok(())
 }

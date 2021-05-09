@@ -8,7 +8,7 @@ use std::time::Duration;
 use clap::{App, ArgMatches};
 use futures::stream::{self, StreamExt};
 
-use feedspool::feeds::{FeedPollResult, FeedPollError};
+use feedspool::feeds::{FeedPollError, FeedPollResult};
 use feedspool::{db, feeds};
 
 pub const NAME: &str = "fetch";
@@ -19,7 +19,7 @@ pub fn app() -> App<'static> {
 
 pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(), Box<dyn Error>> {
     let concurrency_limit = 32;
-    let min_fetch_period = Duration::from_secs(5); //60 * 30);
+    let min_fetch_period = Duration::from_secs(60 * 30);
     let request_timeout = Duration::from_secs(5);
 
     /*
@@ -49,27 +49,25 @@ pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(
                             .await
                         {
                             Ok(fetch_result) => match fetch_result {
-                                FeedPollResult::Skipped { .. } => {
-                                    log::info!("Skipped update for {}", url)
-                                }
+                                FeedPollResult::Skipped => log::info!("Skipped update for {}", url),
                                 FeedPollResult::NotModified { .. } => {
                                     log::info!("No updates for {}", url)
                                 }
-                                FeedPollResult::Updated { .. } => {
-                                    log::info!("Updated {}", url)
-                                }
+                                FeedPollResult::Updated { .. } => log::info!("Updated {}", url),
                                 _ => log::info!("Unexpected result {} {:?}", url, fetch_result),
                             },
                             Err(error) => match error {
-                                FeedPollError::FetchFailed { status, .. } => {
-                                    log::error!("Fetch failed with status {} for {}", status, url)
-                                },
-                                FeedPollError::NotFound { .. } => {
+                                FeedPollError::FetchFailed { fetch } => log::error!(
+                                    "Fetch failed with status {} for {}",
+                                    fetch.status,
+                                    url
+                                ),
+                                FeedPollError::NotFound(_) => {
                                     log::error!("Not found error for {}", url)
-                                },
-                                FeedPollError::Timedout { .. } => {
+                                }
+                                FeedPollError::Timedout(_) => {
                                     log::error!("Fetch timed out for {}", url)
-                                },
+                                }
                                 FeedPollError::ParseError { error, .. } => {
                                     log::error!("Feed parsing failed for {} - {:?}", url, error)
                                 }
