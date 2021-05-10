@@ -60,6 +60,22 @@ fn record_feed_history_error(
     insert_feed_history_error(&conn, &url, &error)
 }
 
+async fn _poll_one_feed(
+    conn: &SqliteConnection,
+    url: &str,
+    request_timeout: Duration,
+    min_fetch_period: Duration,
+) -> Result<FeedPollResult, FeedPollError> {
+    if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
+        log::trace!("Skipped fetch for {} - min fetch period", &url);
+        return Ok(FeedPollResult::Skipped);
+    }
+    let last_get_conditions = find_last_get_conditions(&conn, &url);
+    let mut fetch_result = fetch_feed(url, request_timeout, last_get_conditions).await?;
+    fetch_result = update_feed(&conn, fetch_result)?;
+    Ok(fetch_result)
+}
+
 fn was_feed_recently_fetched(
     conn: &SqliteConnection,
     url: &str,
