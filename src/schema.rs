@@ -4,7 +4,7 @@ table! {
         feed_id -> Nullable<Text>,
         published -> Nullable<Text>,
         created_at -> Nullable<Text>,
-        updated_at -> Nullable<Text>,
+        modified_at -> Nullable<Text>,
         defunct -> Nullable<Bool>,
         json -> Nullable<Text>,
         guid -> Nullable<Text>,
@@ -12,6 +12,7 @@ table! {
         link -> Nullable<Text>,
         summary -> Nullable<Text>,
         content -> Nullable<Text>,
+        updated -> Nullable<Text>,
     }
 }
 
@@ -36,12 +37,13 @@ table! {
         id -> Nullable<Text>,
         published -> Nullable<Text>,
         created_at -> Nullable<Text>,
-        updated_at -> Nullable<Text>,
+        modified_at -> Nullable<Text>,
         url -> Nullable<Text>,
         title -> Nullable<Text>,
         subtitle -> Nullable<Text>,
         link -> Nullable<Text>,
         json -> Nullable<Text>,
+        updated -> Nullable<Text>,
     }
 }
 

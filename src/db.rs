@@ -1,8 +1,8 @@
+use chrono::prelude::*;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::embed_migrations;
 use std::error::Error;
-use chrono::prelude::*;
 
 use crate::feeds::result::{ConditionalGetData, FeedFetchResult, FeedPollError};
 
@@ -38,7 +38,7 @@ pub fn feed_id_from_url(url: &str) -> String {
 }
 
 /// # Errors
-/// 
+///
 /// Returns `diesel::result::Error` for any DB failure
 pub fn upsert_feed(
     conn: &SqliteConnection,
@@ -62,7 +62,8 @@ pub fn upsert_feed(
                 link: Some(&upsert.link),
                 url: Some(&upsert.url),
                 published: Some(&upsert.published),
-                updated_at: Some(&upsert.now),
+                updated: Some(&upsert.updated),
+                modified_at: Some(&upsert.now),
             })
             .execute(conn)?;
     } else {
@@ -75,7 +76,7 @@ pub fn upsert_feed(
                 url: &upsert.url,
                 published: &upsert.published,
                 created_at: &upsert.now,
-                updated_at: &upsert.now,
+                modified_at: &upsert.now,
             })
             .execute(conn)?;
     }
@@ -83,7 +84,7 @@ pub fn upsert_feed(
 }
 
 /// # Errors
-/// 
+///
 /// Returns `diesel::result::Error` for any DB failure
 pub fn upsert_entry(
     conn: &SqliteConnection,
@@ -109,7 +110,8 @@ pub fn upsert_entry(
                 summary: Some(&upsert.summary),
                 content: Some(&upsert.content),
                 published: Some(&upsert.published),
-                updated_at: Some(&upsert.published),
+                updated: Some(&upsert.updated),
+                modified_at: Some(&upsert.now),
             })
             .execute(conn)?;
     } else {
@@ -124,8 +126,9 @@ pub fn upsert_entry(
                 summary: &upsert.summary,
                 content: &upsert.content,
                 published: &upsert.published,
-                updated_at: &upsert.published,
-                created_at: &upsert.published,
+                updated: &upsert.updated,
+                modified_at: &upsert.now,
+                created_at: &upsert.now,
             })
             .execute(conn)?;
     }
@@ -133,7 +136,7 @@ pub fn upsert_entry(
 }
 
 /// # Errors
-/// 
+///
 /// Returns `FeedPollError::DatabaseError` for any DB failure
 pub fn insert_feed_history(
     conn: &SqliteConnection,
@@ -166,7 +169,7 @@ pub fn insert_feed_history(
 }
 
 /// # Errors
-/// 
+///
 /// Returns `FeedPollError::DatabaseError` for any DB failure
 pub fn insert_feed_history_error(
     conn: &SqliteConnection,

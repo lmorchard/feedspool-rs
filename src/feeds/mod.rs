@@ -141,6 +141,16 @@ async fn fetch_feed(
     }
 }
 
+fn clamp_future_date_to_now<'a>(
+    now: &'a DateTime<Utc>,
+    thedate: &'a DateTime<Utc>,
+) -> &'a DateTime<Utc> {
+    if thedate < now {
+        return thedate;
+    }
+    now
+}
+
 fn update_feed(
     conn: &SqliteConnection,
     fetch_result: FeedPollResult,
@@ -151,11 +161,14 @@ fn update_feed(
         FeedPollResult::Fetched { feed, fetch, .. } => {
             let now = Utc::now();
 
-            let mut feed_published = String::from(&now.to_rfc3339());
+            let mut feed_published = String::from("");
             if let Some(published_date) = feed.published {
-                if published_date < now {
-                    feed_published = published_date.to_rfc3339();
-                }
+                feed_published = clamp_future_date_to_now(&now, &published_date).to_rfc3339();
+            };
+
+            let mut feed_updated = String::from("");
+            if let Some(updated_date) = feed.updated {
+                feed_updated = clamp_future_date_to_now(&now, &updated_date).to_rfc3339();
             };
 
             let mut feed_title = "";
@@ -177,6 +190,7 @@ fn update_feed(
                     link: &feed_link,
                     url: &fetch.url,
                     published: &feed_published,
+                    updated: &feed_updated,
                     now: &now.to_rfc3339(),
                 },
             ) {
@@ -203,11 +217,14 @@ fn update_entry(
 
     let now = Utc::now();
 
-    let mut entry_published = String::from(&now.to_rfc3339());
+    let mut entry_published = String::from("");
     if let Some(published_date) = entry.published {
-        if published_date < now {
-            entry_published = published_date.to_rfc3339();
-        }
+        entry_published = clamp_future_date_to_now(&now, &published_date).to_rfc3339();
+    };
+
+    let mut entry_updated = String::from("");
+    if let Some(updated_date) = entry.updated {
+        entry_updated = clamp_future_date_to_now(&now, &updated_date).to_rfc3339();
     };
 
     let mut entry_title = "";
@@ -251,6 +268,8 @@ fn update_entry(
             summary: &entry_summary,
             content: &entry_content,
             published: &entry_published,
+            updated: &entry_updated,
+            now: &now.to_rfc3339(),
         },
     )?;
     Ok(())
