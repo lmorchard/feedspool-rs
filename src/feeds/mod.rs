@@ -2,7 +2,6 @@
 #![allow(clippy::large_enum_variant)]
 
 use chrono::prelude::*;
-use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use feed_rs::model::Entry;
 use feed_rs::parser;
@@ -14,7 +13,7 @@ pub mod result;
 
 use db::{
     feed_id_from_url, find_last_fetch_time, find_last_get_conditions, insert_feed_history,
-    upsert_entry, upsert_feed,
+    insert_feed_history_error, upsert_entry, upsert_feed,
 };
 use result::{ConditionalGetData, FeedFetchResult, FeedPollError, FeedPollResult};
 
@@ -27,6 +26,7 @@ pub async fn poll_one_feed(
     request_timeout: Duration,
     min_fetch_period: Duration,
 ) -> Result<FeedPollResult, FeedPollError> {
+    // TODO: this wraps another function so I can try/catch an Err() from any of the ? operators - is there a better way?
     match _poll_one_feed(conn, url, request_timeout, min_fetch_period).await {
         Ok(fetch_result) => {
             record_feed_history_success(&conn, &fetch_result)?;
@@ -39,20 +39,25 @@ pub async fn poll_one_feed(
     }
 }
 
-async fn _poll_one_feed(
+fn record_feed_history_success(
+    conn: &SqliteConnection,
+    fetch_result: &FeedPollResult,
+) -> Result<(), FeedPollError> {
+    match &fetch_result {
+        FeedPollResult::Updated { fetch, .. } | FeedPollResult::NotModified { fetch, .. } => {
+            insert_feed_history(&conn, &fetch)?;
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn record_feed_history_error(
     conn: &SqliteConnection,
     url: &str,
-    request_timeout: Duration,
-    min_fetch_period: Duration,
-) -> Result<FeedPollResult, FeedPollError> {
-    if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
-        log::trace!("Skipped fetch for {} - min fetch period", &url);
-        return Ok(FeedPollResult::Skipped);
-    }
-    let last_get_conditions = find_last_get_conditions(&conn, &url);
-    let mut fetch_result = fetch_feed(url, request_timeout, last_get_conditions).await?;
-    fetch_result = update_feed(&conn, fetch_result)?;
-    Ok(fetch_result)
+    error: &FeedPollError,
+) -> Result<(), FeedPollError> {
+    insert_feed_history_error(&conn, &url, &error)
 }
 
 fn was_feed_recently_fetched(
@@ -142,6 +147,8 @@ fn update_feed(
     conn: &SqliteConnection,
     fetch_result: FeedPollResult,
 ) -> Result<FeedPollResult, FeedPollError> {
+    use crate::models;
+
     match &fetch_result {
         FeedPollResult::Fetched { feed, fetch, .. } => {
             let now = Utc::now();
@@ -166,12 +173,14 @@ fn update_feed(
 
             if let Err(error) = upsert_feed(
                 &conn,
-                &now,
-                &fetch.id,
-                &fetch.url,
-                &feed_title,
-                &feed_link,
-                &feed_published,
+                &models::FeedUpsert {
+                    id: &fetch.id,
+                    title: &feed_title,
+                    link: &feed_link,
+                    url: &fetch.url,
+                    published: &feed_published,
+                    now: &now.to_rfc3339(),
+                },
             ) {
                 return Err(fetch_result.fetched_to_update_error(error));
             }
@@ -187,51 +196,13 @@ fn update_feed(
     }
 }
 
-fn record_feed_history_success(
-    conn: &SqliteConnection,
-    fetch_result: &FeedPollResult,
-) -> Result<(), FeedPollError> {
-    match &fetch_result {
-        FeedPollResult::Updated { fetch, .. } | FeedPollResult::NotModified { fetch, .. } => {
-            insert_feed_history(&conn, &fetch)?;
-            Ok(())
-        }
-        _ => Ok(()),
-    }
-}
-
-fn record_feed_history_error(
-    conn: &SqliteConnection,
-    url: &str,
-    error: &FeedPollError,
-) -> Result<(), FeedPollError> {
-    let now = Utc::now().to_rfc3339();
-    let feed_id = feed_id_from_url(&url);
-    let history_id = &format!("{:x}", Sha256::new().chain(&feed_id).chain(&now).finalize());
-    {
-        use crate::models;
-        use crate::schema::feed_history;
-        if let Err(db_error) = diesel::insert_into(feed_history::table)
-            .values(models::FeedHistoryNewError {
-                id: history_id,
-                feed_id: &feed_id,
-                created_at: &now,
-                is_error: true,
-                error_text: format!("{:?}", &error).as_str(),
-            })
-            .execute(conn)
-        {
-            return Err(FeedPollError::DatabaseError(db_error));
-        }
-    }
-    Ok(())
-}
-
 fn update_entry(
     conn: &SqliteConnection,
     parent_feed_id: &str,
     entry: &Entry,
 ) -> Result<(), diesel::result::Error> {
+    use crate::models;
+
     let now = Utc::now();
 
     let mut entry_published = String::from(&now.to_rfc3339());
@@ -274,14 +245,15 @@ fn update_entry(
 
     upsert_entry(
         &conn,
-        &now,
-        parent_feed_id,
-        &entry_id,
-        &entry_published,
-        &entry_title,
-        &entry_link,
-        &entry_summary,
-        &entry_content,
+        &models::EntryUpsert {
+            id: &entry_id,
+            feed_id: &parent_feed_id,
+            title: &entry_title,
+            link: &entry_link,
+            summary: &entry_summary,
+            content: &entry_content,
+            published: &entry_published,
+        },
     )?;
     Ok(())
 }

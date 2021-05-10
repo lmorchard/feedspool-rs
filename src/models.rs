@@ -14,6 +14,16 @@ pub struct Entry {
     pub content: String,
 }
 
+pub struct EntryUpsert<'a> {
+    pub id: &'a str,
+    pub feed_id: &'a str,
+    pub title: &'a str,
+    pub link: &'a str,
+    pub summary: &'a str,
+    pub content: &'a str,
+    pub published: &'a str,
+}
+
 #[derive(Insertable)]
 #[table_name = "entries"]
 pub struct EntryNew<'a> {
@@ -85,6 +95,15 @@ pub struct Feed {
     pub subtitle: String,
     pub link: String,
     pub json: String,
+}
+
+pub struct FeedUpsert<'a> {
+    pub id: &'a str,
+    pub title: &'a str,
+    pub link: &'a str,
+    pub url: &'a str,
+    pub published: &'a str,
+    pub now: &'a str,
 }
 
 #[derive(Insertable)]

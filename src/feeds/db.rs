@@ -1,6 +1,3 @@
-// TODO: cobble together some model types for the upsert methods
-#![allow(clippy::too_many_arguments)]
-
 use chrono::prelude::*;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
@@ -15,46 +12,40 @@ pub fn feed_id_from_url(url: &str) -> String {
 
 pub fn upsert_feed(
     conn: &SqliteConnection,
-    now: &DateTime<Utc>,
-    // TODO: wrap up these args in a model type
-    feed_id: &str,
-    feed_url: &str,
-    feed_title: &str,
-    feed_link: &str,
-    feed_published: &str,
+    upsert: &crate::models::FeedUpsert,
 ) -> Result<(), diesel::result::Error> {
     use crate::models;
     use crate::schema::feeds::dsl::{feeds, id};
 
     let feed_exists = feeds
-        .filter(id.eq(&feed_id))
+        .filter(id.eq(&upsert.id))
         .count()
         .get_result::<i64>(conn)?
         > 0;
 
     if feed_exists {
-        log::trace!("Feed exists {}", feed_id);
+        log::trace!("Feed exists {}", &upsert.id);
         diesel::update(feeds)
-            .filter(id.eq(&feed_id))
+            .filter(id.eq(&upsert.id))
             .set(models::FeedUpdate {
-                title: Some(&feed_title),
-                link: Some(&feed_link),
-                url: Some(feed_url),
-                published: Some(&feed_published),
-                updated_at: Some(&now.to_rfc3339()),
+                title: Some(&upsert.title),
+                link: Some(&upsert.link),
+                url: Some(&upsert.url),
+                published: Some(&upsert.published),
+                updated_at: Some(&upsert.now),
             })
             .execute(conn)?;
     } else {
-        log::trace!("Feed new {}", feed_id);
+        log::trace!("Feed new {}", &upsert.id);
         diesel::insert_into(feeds)
             .values(models::FeedNew {
-                id: &feed_id,
-                title: &feed_title,
-                link: &feed_link,
-                url: feed_url,
-                published: &feed_published,
-                created_at: &now.to_rfc3339(),
-                updated_at: &now.to_rfc3339(),
+                id: &upsert.id,
+                title: &upsert.title,
+                link: &upsert.link,
+                url: &upsert.url,
+                published: &upsert.published,
+                created_at: &upsert.now,
+                updated_at: &upsert.now,
             })
             .execute(conn)?;
     }
@@ -63,53 +54,45 @@ pub fn upsert_feed(
 
 pub fn upsert_entry(
     conn: &SqliteConnection,
-    now: &DateTime<Utc>,
-    // TODO: wrap up these args in a model type
-    parent_feed_id: &str,
-    entry_id: &str,
-    entry_published: &str,
-    entry_title: &str,
-    entry_link: &str,
-    entry_summary: &str,
-    entry_content: &str,
+    upsert: &crate::models::EntryUpsert,
 ) -> Result<(), diesel::result::Error> {
     use crate::models;
-    use crate::schema::entries::dsl::{entries, feed_id, id};
+    use crate::schema::entries::dsl::{entries, id};
 
     let entry_exists = entries
-        .filter(id.eq(&entry_id))
+        .filter(id.eq(&upsert.id))
         .count()
         .get_result::<i64>(conn)?
         > 0;
 
     if entry_exists {
-        log::trace!("Entry exists {}", entry_id);
+        log::trace!("Entry exists {}", &upsert.id);
         diesel::update(entries)
-            .filter(id.eq(&feed_id))
+            .filter(id.eq(&upsert.id))
             .set(models::EntryUpdate {
                 defunct: Some(false),
-                published: Some(&entry_published),
-                updated_at: Some(&now.to_rfc3339()),
-                title: Some(&entry_title),
-                link: Some(&entry_link),
-                summary: Some(&entry_summary),
-                content: Some(&entry_content),
+                title: Some(&upsert.title),
+                link: Some(&upsert.link),
+                summary: Some(&upsert.summary),
+                content: Some(&upsert.content),
+                published: Some(&upsert.published),
+                updated_at: Some(&upsert.published),
             })
             .execute(conn)?;
     } else {
-        log::trace!("Entry new {}", entry_id);
+        log::trace!("Entry new {}", &upsert.id);
         diesel::insert_into(entries)
             .values(models::EntryNew {
-                feed_id: parent_feed_id,
-                id: &entry_id,
+                id: &upsert.id,
+                feed_id: &upsert.feed_id,
                 defunct: false,
-                published: &entry_published,
-                created_at: &now.to_rfc3339(),
-                updated_at: &now.to_rfc3339(),
-                title: &entry_title,
-                link: &entry_link,
-                summary: &entry_summary,
-                content: &entry_content,
+                title: &upsert.title,
+                link: &upsert.link,
+                summary: &upsert.summary,
+                content: &upsert.content,
+                published: &upsert.published,
+                updated_at: &upsert.published,
+                created_at: &upsert.published,
             })
             .execute(conn)?;
     }
@@ -137,6 +120,33 @@ pub fn insert_feed_history(
                 etag: header_or_blank(&fetch.headers, reqwest::header::ETAG),
                 last_modified: header_or_blank(&fetch.headers, reqwest::header::LAST_MODIFIED),
                 created_at: &now,
+            })
+            .execute(conn)
+        {
+            return Err(FeedPollError::DatabaseError(db_error));
+        }
+    }
+    Ok(())
+}
+
+pub fn insert_feed_history_error(
+    conn: &SqliteConnection,
+    url: &str,
+    error: &FeedPollError,
+) -> Result<(), FeedPollError> {
+    let now = Utc::now().to_rfc3339();
+    let feed_id = feed_id_from_url(&url);
+    let history_id = &format!("{:x}", Sha256::new().chain(&feed_id).chain(&now).finalize());
+    {
+        use crate::models;
+        use crate::schema::feed_history;
+        if let Err(db_error) = diesel::insert_into(feed_history::table)
+            .values(models::FeedHistoryNewError {
+                id: history_id,
+                feed_id: &feed_id,
+                created_at: &now,
+                is_error: true,
+                error_text: format!("{:?}", &error).as_str(),
             })
             .execute(conn)
         {
