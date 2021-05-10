@@ -8,10 +8,9 @@ use feed_rs::parser;
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
-mod db;
 pub mod result;
 
-use db::{
+use crate::db::{
     feed_id_from_url, find_last_fetch_time, find_last_get_conditions, insert_feed_history,
     insert_feed_history_error, upsert_entry, upsert_feed,
 };
@@ -29,35 +28,18 @@ pub async fn poll_one_feed(
     // TODO: this wraps another function so I can try/catch an Err() from any of the ? operators - is there a better way?
     match _poll_one_feed(conn, url, request_timeout, min_fetch_period).await {
         Ok(fetch_result) => {
-            record_feed_history_success(&conn, &fetch_result)?;
+            if let FeedPollResult::Updated { fetch, .. }
+            | FeedPollResult::NotModified { fetch, .. } = &fetch_result
+            {
+                insert_feed_history(&conn, &fetch)?;
+            }
             Ok(fetch_result)
         }
         Err(error) => {
-            record_feed_history_error(&conn, &url, &error)?;
+            insert_feed_history_error(&conn, &url, &error)?;
             Err(error)
         }
     }
-}
-
-fn record_feed_history_success(
-    conn: &SqliteConnection,
-    fetch_result: &FeedPollResult,
-) -> Result<(), FeedPollError> {
-    match &fetch_result {
-        FeedPollResult::Updated { fetch, .. } | FeedPollResult::NotModified { fetch, .. } => {
-            insert_feed_history(&conn, &fetch)?;
-            Ok(())
-        }
-        _ => Ok(()),
-    }
-}
-
-fn record_feed_history_error(
-    conn: &SqliteConnection,
-    url: &str,
-    error: &FeedPollError,
-) -> Result<(), FeedPollError> {
-    insert_feed_history_error(&conn, &url, &error)
 }
 
 async fn _poll_one_feed(
