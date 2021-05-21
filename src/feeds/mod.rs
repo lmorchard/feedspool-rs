@@ -17,7 +17,7 @@ use crate::db::{
 use result::{ConditionalGetData, FeedFetchResult, FeedPollError, FeedPollResult};
 
 /// # Errors
-///
+/// 
 /// Will return Err for any failure while polling a feed
 pub async fn poll_one_feed(
     conn: &SqliteConnection,
@@ -79,6 +79,13 @@ fn was_feed_recently_fetched(
     Ok(false)
 }
 
+/// # Errors
+/// 
+/// Will return `FeedPollError` for any failure while fetching a feed
+///
+/// # Panics
+/// 
+/// Shouldn't be any panics here
 pub async fn fetch_feed(
     url: &str,
     timeout_duration: Duration,

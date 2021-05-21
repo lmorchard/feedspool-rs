@@ -1,5 +1,4 @@
 use clap::{App, Arg, ArgMatches};
-use serde_json;
 use std::error::Error;
 use std::str;
 use std::time::Duration;
@@ -26,14 +25,14 @@ pub async fn execute(matches: &ArgMatches, config: &config::Config) -> Result<()
 
         let last_get_conditions = db::find_last_get_conditions(&conn, &url);
         let fetch_result = feeds::fetch_feed(url, request_timeout, last_get_conditions).await;
-        match fetch_result {
-            Ok(result) => match result {
-                feeds::result::FeedPollResult::Fetched { feed, .. } => {
-                    log::info!("Feed: {:?}", serde_json::to_string(&feed).unwrap())
-                }
-                _ => log::info!("Fetch result: {:?}", &result),
-            },
-            _ => log::info!("Fetch result: {:?}", &fetch_result),
+        if let Ok(result) = fetch_result {
+            if let feeds::result::FeedPollResult::Fetched { feed, .. } = result {
+                log::info!("Feed: {:?}", serde_json::to_string(&feed).unwrap())
+            } else {
+                log::info!("Fetch result: {:?}", &result);
+            }
+        } else {
+            log::info!("Fetch result: {:?}", &fetch_result);
         }
     } else {
         log::error!("--url is required");
