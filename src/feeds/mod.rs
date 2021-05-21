@@ -79,7 +79,7 @@ fn was_feed_recently_fetched(
     Ok(false)
 }
 
-async fn fetch_feed(
+pub async fn fetch_feed(
     url: &str,
     timeout_duration: Duration,
     last_get_conditions: Option<ConditionalGetData>,
@@ -182,10 +182,21 @@ fn update_feed(
                 feed_link = &feed.links[0].href;
             }
 
+            let feed_json = match serde_json::to_string(&feed) {
+                Ok(json) => json,
+                Err(_) => String::from(""),
+            };
+            for entry in &feed.entries {
+                if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
+                    return Err(fetch_result.fetched_to_update_error(error));
+                }
+            }
+
             if let Err(error) = upsert_feed(
                 &conn,
                 &models::FeedUpsert {
                     id: &fetch.id,
+                    json: &feed_json,
                     title: &feed_title,
                     link: &feed_link,
                     url: &fetch.url,
@@ -195,11 +206,6 @@ fn update_feed(
                 },
             ) {
                 return Err(fetch_result.fetched_to_update_error(error));
-            }
-            for entry in &feed.entries {
-                if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
-                    return Err(fetch_result.fetched_to_update_error(error));
-                }
             }
 
             Ok(fetch_result.fetched_to_updated())
@@ -258,11 +264,17 @@ fn update_entry(
             .finalize()
     );
 
+    let entry_json = match serde_json::to_string(&entry) {
+        Ok(json) => json,
+        Err(_) => String::from(""),
+    };
+
     upsert_entry(
         &conn,
         &models::EntryUpsert {
             id: &entry_id,
             feed_id: &parent_feed_id,
+            json: &entry_json,
             title: &entry_title,
             link: &entry_link,
             summary: &entry_summary,

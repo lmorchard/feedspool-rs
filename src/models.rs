@@ -1,7 +1,7 @@
 use super::schema::{entries, feed_history, feeds};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Queryable, PartialEq, Debug, Serialize)]
+#[derive(Queryable, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Entry {
     pub id: Option<String>,
     pub feed_id: Option<String>,
@@ -21,6 +21,7 @@ pub struct Entry {
 pub struct EntryUpsert<'a> {
     pub id: &'a str,
     pub feed_id: &'a str,
+    pub json: &'a str,
     pub title: &'a str,
     pub link: &'a str,
     pub summary: &'a str,
@@ -44,6 +45,7 @@ pub struct EntryNew<'a> {
     pub link: &'a str,
     pub summary: &'a str,
     pub content: &'a str,
+    pub json: &'a str,    
 }
 
 #[derive(AsChangeset)]
@@ -57,6 +59,7 @@ pub struct EntryUpdate<'a> {
     pub link: Option<&'a str>,
     pub summary: Option<&'a str>,
     pub content: Option<&'a str>,
+    pub json: Option<&'a str>,    
 }
 
 #[derive(Queryable)]
@@ -93,9 +96,10 @@ pub struct FeedHistoryNewError<'a> {
     pub error_text: &'a str,
 }
 
-#[derive(Queryable)]
+#[derive(Queryable, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Feed {
     pub id: Option<String>,
+    pub published: Option<String>,
     pub created_at: Option<String>,
     pub modified_at: Option<String>,
     pub url: Option<String>,
@@ -103,12 +107,12 @@ pub struct Feed {
     pub subtitle: Option<String>,
     pub link: Option<String>,
     pub json: Option<String>,
-    pub published: Option<String>,
     pub updated: Option<String>,
 }
 
 pub struct FeedUpsert<'a> {
     pub id: &'a str,
+    pub json: &'a str,
     pub title: &'a str,
     pub link: &'a str,
     pub url: &'a str,
@@ -127,6 +131,7 @@ pub struct FeedNew<'a> {
     pub url: &'a str,
     pub title: &'a str,
     pub link: &'a str,
+    pub json: &'a str,    
 }
 
 #[derive(AsChangeset)]
@@ -138,4 +143,5 @@ pub struct FeedUpdate<'a> {
     pub url: Option<&'a str>,
     pub title: Option<&'a str>,
     pub link: Option<&'a str>,
+    pub json: Option<&'a str>,    
 }

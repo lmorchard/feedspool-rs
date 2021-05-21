@@ -58,6 +58,7 @@ pub fn upsert_feed(
         diesel::update(feeds)
             .filter(id.eq(&upsert.id))
             .set(models::FeedUpdate {
+                json: Some(&upsert.json),
                 title: Some(&upsert.title),
                 link: Some(&upsert.link),
                 url: Some(&upsert.url),
@@ -71,6 +72,7 @@ pub fn upsert_feed(
         diesel::insert_into(feeds)
             .values(models::FeedNew {
                 id: &upsert.id,
+                json: &upsert.json,
                 title: &upsert.title,
                 link: &upsert.link,
                 url: &upsert.url,
@@ -105,6 +107,7 @@ pub fn upsert_entry(
             .filter(id.eq(&upsert.id))
             .set(models::EntryUpdate {
                 defunct: Some(false),
+                json: Some(&upsert.json),
                 title: Some(&upsert.title),
                 link: Some(&upsert.link),
                 summary: Some(&upsert.summary),
@@ -121,6 +124,7 @@ pub fn upsert_entry(
                 id: &upsert.id,
                 feed_id: &upsert.feed_id,
                 defunct: false,
+                json: &upsert.json,
                 title: &upsert.title,
                 link: &upsert.link,
                 summary: &upsert.summary,

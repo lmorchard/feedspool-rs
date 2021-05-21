@@ -236,8 +236,7 @@ dependencies = [
 [[package]]
 name = "feed-rs"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd6ed95fc2e8bbc98f55ff5bb2e49183c2b16cf367bf4b67081182a3a9b0d231"
+source = "git+https://github.com/lmorchard/feed-rs?branch=serde-restore#c358b771fd5f31cf89465cd028fd83520d395bbc"
 dependencies = [
  "chrono",
  "lazy_static",
@@ -271,6 +270,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "time",
+ "tinytemplate",
  "tokio",
  "toml",
  "xml-rs",
@@ -1318,6 +1318,16 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "tinytemplate"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be4d6b5f19ff7664e8c98d03e2139cb510db9b0a60b55f8e8709b689d939b6bc"
+dependencies = [
+ "serde 1.0.125",
+ "serde_json",
 ]
 
 [[package]]
