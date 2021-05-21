@@ -6,6 +6,8 @@ Feeds on the web need periodic polling. This aims to be a tool for doing that an
 
 ## To Do
 
+* Port over my thumbnail-scraper to fetch images for feed entries
+
 * OPML import / export
 
 * Feed subscription management
