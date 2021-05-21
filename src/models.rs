@@ -1,5 +1,5 @@
 use super::schema::{entries, feed_history, feeds};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Entry {
@@ -45,7 +45,7 @@ pub struct EntryNew<'a> {
     pub link: &'a str,
     pub summary: &'a str,
     pub content: &'a str,
-    pub json: &'a str,    
+    pub json: &'a str,
 }
 
 #[derive(AsChangeset)]
@@ -59,7 +59,7 @@ pub struct EntryUpdate<'a> {
     pub link: Option<&'a str>,
     pub summary: Option<&'a str>,
     pub content: Option<&'a str>,
-    pub json: Option<&'a str>,    
+    pub json: Option<&'a str>,
 }
 
 #[derive(Queryable)]
@@ -131,7 +131,7 @@ pub struct FeedNew<'a> {
     pub url: &'a str,
     pub title: &'a str,
     pub link: &'a str,
-    pub json: &'a str,    
+    pub json: &'a str,
 }
 
 #[derive(AsChangeset)]
@@ -143,5 +143,5 @@ pub struct FeedUpdate<'a> {
     pub url: Option<&'a str>,
     pub title: Option<&'a str>,
     pub link: Option<&'a str>,
-    pub json: Option<&'a str>,    
+    pub json: Option<&'a str>,
 }
