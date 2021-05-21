@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate config;
+extern crate tinytemplate;
 
 mod cli;
 
