@@ -142,32 +142,33 @@ fn handle_entry(row: (models::Entry, Option<models::Feed>)) -> FeedEntry {
     }
 
     for content in &[&entry.content, &entry.summary] {
-        if let Some(content) = content {
-            let fragment = Html::parse_fragment(&content);
-            let selector = Selector::parse("a").unwrap();
-            for element_ref in fragment.select(&selector) {
-                let element = element_ref.value();
-                if let Some(link) = element.attr("href") {
-                    let link_url = Url::parse(&link);
-                    if let Ok(mut link_url) = link_url {
-                        if let Ok(entry_url) = &entry_url {
-                            if link_url.origin() == entry_url.origin() {
-                                continue;
-                            }
+        if !content.is_some() {
+            continue;
+        }
+        let fragment = Html::parse_fragment(content.as_ref().unwrap());
+        let selector = Selector::parse("a").unwrap();
+        for element_ref in fragment.select(&selector) {
+            let element = element_ref.value();
+            if let Some(link) = element.attr("href") {
+                let link_url = Url::parse(&link);
+                if let Ok(mut link_url) = link_url {
+                    if let Ok(entry_url) = &entry_url {
+                        if link_url.origin() == entry_url.origin() {
+                            continue;
                         }
-                        if let Ok(feed_url) = &feed_url {
-                            if link_url.origin() == feed_url.origin() {
-                                continue;
-                            }
-                        }
-                        link_url.set_fragment(None);
-                        //link_url.set_query(None);
-                        links.insert(String::from(link_url));
                     }
+                    if let Ok(feed_url) = &feed_url {
+                        if link_url.origin() == feed_url.origin() {
+                            continue;
+                        }
+                    }
+                    link_url.set_fragment(None);
+                    //link_url.set_query(None);
+                    links.insert(String::from(link_url));
                 }
             }
         }
     }
 
-    FeedEntry { entry, feed, links }
+    FeedEntry { feed, entry, links }
 }
