@@ -1,5 +1,8 @@
 use super::schema::{entries, feed_history, feeds};
+use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
+
+// TODO: rework schema to make most fields non-nullable?
 
 #[derive(Queryable, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Entry {
@@ -62,7 +65,8 @@ pub struct EntryUpdate<'a> {
     pub json: Option<&'a str>,
 }
 
-#[derive(Queryable)]
+#[derive(Queryable, PartialEq, Debug, Serialize, Deserialize, GraphQLObject)]
+#[graphql(description = "An event in feed fetch history")]
 pub struct FeedHistory {
     pub id: String,
     pub feed_id: String,

@@ -1,14 +1,22 @@
 use chrono::prelude::*;
 use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
 use diesel_migrations::embed_migrations;
 use std::error::Error;
+
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    sqlite::SqliteConnection,
+};
 
 use crate::feeds::result::{ConditionalGetData, FeedFetchResult, FeedPollError};
 
 use sha2::{Digest, Sha256};
 
 embed_migrations!("migrations");
+
+pub mod paginate_dsl;
+
+pub type SqlitePool = Pool<ConnectionManager<SqliteConnection>>;
 
 /// # Errors
 ///
@@ -32,6 +40,17 @@ pub fn connect(config: &config::Config) -> Result<SqliteConnection, Box<dyn Erro
     Ok(SqliteConnection::establish(&database_url)?)
 }
 
+/// # Errors
+///
+/// Will return Err for problems getting `database_url` from config or creating database pool
+pub fn create_pool(config: &config::Config) -> Result<SqlitePool, Box<dyn Error>> {
+    let database_url = &config.get_str("database_url")?;
+    Ok(SqlitePool::builder()
+        .max_size(8)
+        .build(ConnectionManager::new(database_url))?)
+}
+
+// TODO: remove ID generation code for feed - feed-rs already does this?
 #[must_use]
 pub fn feed_id_from_url(url: &str) -> String {
     format!("{:x}", Sha256::new().chain(url).finalize())

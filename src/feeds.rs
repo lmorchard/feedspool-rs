@@ -228,6 +228,8 @@ fn update_entry(
 ) -> Result<(), diesel::result::Error> {
     use crate::models;
 
+    // TODO: skip upserting an entry if it already exists?
+
     let now = Utc::now();
 
     let mut entry_published = String::from("");

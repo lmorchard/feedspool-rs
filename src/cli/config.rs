@@ -10,6 +10,9 @@ pub fn setup(app_m: &ArgMatches) -> Result<config::Config, Box<dyn Error>> {
         .set_default("debug", false)?
         .set_default("log_level", "info")?
         .set_default("database_url", "feedspool.sqlite")?
+        // TODO: split this up so subcommands can contribute defaults?
+        .set_default("http_server_address", "0.0.0.0:3010")?
+        .set_default("http_server_static_path", "./www/")?
         .merge(config::File::with_name("config").required(false))?
         .merge(config::Environment::with_prefix("APP"))?;
 
