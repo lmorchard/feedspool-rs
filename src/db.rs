@@ -177,6 +177,7 @@ pub fn insert_feed_history(
             .values(models::FeedHistoryNewSuccess {
                 id: history_id,
                 feed_id: &fetch.id,
+                // TODO: stop retaining fetched body in history - it's big and not useful?
                 src: &fetch.body,
                 status: &fetch.status,
                 etag: header_or_blank(&fetch.headers, reqwest::header::ETAG),
