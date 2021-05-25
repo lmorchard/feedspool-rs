@@ -50,7 +50,6 @@ pub fn create_pool(config: &config::Config) -> Result<SqlitePool, Box<dyn Error>
         .build(ConnectionManager::new(database_url))?)
 }
 
-// TODO: remove ID generation code for feed - feed-rs already does this?
 #[must_use]
 pub fn feed_id_from_url(url: &str) -> String {
     format!("{:x}", Sha256::new().chain(url).finalize())
@@ -168,6 +167,7 @@ pub fn upsert_entry(
 pub fn insert_feed_history(
     conn: &SqliteConnection,
     fetch: &FeedFetchResult,
+    retain_src: bool,
 ) -> Result<(), FeedPollError> {
     let now = Utc::now().to_rfc3339();
     let history_id = &format!(
@@ -177,12 +177,16 @@ pub fn insert_feed_history(
     {
         use crate::models;
         use crate::schema::feed_history;
+        let mut src = "";
+        if retain_src {
+            src = &fetch.body;
+        }
         if let Err(db_error) = diesel::insert_into(feed_history::table)
             .values(models::FeedHistoryNewSuccess {
                 id: history_id,
                 feed_id: &fetch.id,
                 // TODO: stop retaining fetched body in history - it's big and not useful?
-                src: &fetch.body,
+                src: &src,
                 status: &fetch.status,
                 etag: header_or_blank(&fetch.headers, reqwest::header::ETAG),
                 last_modified: header_or_blank(&fetch.headers, reqwest::header::LAST_MODIFIED),

@@ -24,6 +24,7 @@ pub async fn poll_one_feed(
     url: &str,
     request_timeout: Duration,
     min_fetch_period: Duration,
+    retain_src: bool,
 ) -> Result<FeedPollResult, FeedPollError> {
     // TODO: this wraps another function so I can try/catch an Err() from any of the ? operators - is there a better way?
     match _poll_one_feed(conn, url, request_timeout, min_fetch_period).await {
@@ -31,7 +32,7 @@ pub async fn poll_one_feed(
             if let FeedPollResult::Updated { fetch, .. }
             | FeedPollResult::NotModified { fetch, .. } = &fetch_result
             {
-                insert_feed_history(&conn, &fetch)?;
+                insert_feed_history(&conn, &fetch, retain_src)?;
             }
             Ok(fetch_result)
         }
