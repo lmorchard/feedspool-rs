@@ -164,72 +164,54 @@ fn update_feed(
 ) -> Result<FeedPollResult, FeedPollError> {
     use crate::models;
 
-    match &fetch_result {
-        FeedPollResult::Fetched { feed, fetch, .. } => {
-            let now = Utc::now();
+    if let FeedPollResult::Fetched { feed, fetch, .. } = &fetch_result {
+        let now = Utc::now();
 
-            let mut feed_published = String::from("");
-            if let Some(published_date) = feed.published {
-                feed_published = clamp_future_date_to_now(&now, &published_date).to_rfc3339();
-            };
-
-            let mut feed_updated = String::from("");
-            if let Some(updated_date) = feed.updated {
-                feed_updated = clamp_future_date_to_now(&now, &updated_date).to_rfc3339();
-            };
-
-            let mut feed_title = "";
-            if let Some(t) = &feed.title {
-                feed_title = &t.content;
-            }
-
-            let mut feed_link = "";
-            if !feed.links.is_empty() {
-                // TODO: handle multiple links?
-                feed_link = &feed.links[0].href;
-            }
-
-            let feed_json = match serde_json::to_string(&feed) {
-                Ok(json) => json,
-                Err(_) => String::from(""),
-            };
-
-            let mut last_entry_published: Option<DateTime<Utc>> = None;
-
-            for entry in &feed.entries {
-                if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
-                    return Err(fetch_result.fetched_to_update_error(error));
-                }
-                if let Some(entry_published) = &entry.published {
-                    if last_entry_published.is_none()
-                        || entry_published > last_entry_published.as_ref().unwrap()
-                    {
-                        last_entry_published.replace(entry_published.clone());
-                    }
-                }
-            }
-
-            if let Err(error) = upsert_feed(
-                &conn,
-                &models::FeedUpsert {
-                    id: &fetch.id,
-                    json: &feed_json,
-                    title: &feed_title,
-                    link: &feed_link,
-                    url: &fetch.url,
-                    published: &feed_published,
-                    updated: &feed_updated,
-                    now: &now.to_rfc3339(),
-                    last_entry_published: &last_entry_published
-                        .map_or(String::from(""), |dt| dt.to_rfc3339()),
-                },
-            ) {
+        let mut last_entry_published: Option<DateTime<Utc>> = None;
+        for entry in &feed.entries {
+            if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
                 return Err(fetch_result.fetched_to_update_error(error));
             }
-
-            Ok(fetch_result.fetched_to_updated())
+            if let Some(entry_published) = &entry.published {
+                let entry_published = clamp_future_date_to_now(&now, entry_published);
+                if last_entry_published.is_none()
+                    || entry_published > last_entry_published.as_ref().unwrap()
+                {
+                    last_entry_published.replace(*entry_published);
+                }
+            }
         }
-        _ => Ok(fetch_result),
+
+        match upsert_feed(
+            &conn,
+            &models::FeedUpsert {
+                now: &now.to_rfc3339(),
+                id: &fetch.id,
+                url: &fetch.url,
+                json: &serde_json::to_string(&feed).unwrap_or_else(|_| String::from("")),
+                last_entry_published: &last_entry_published
+                    .map_or_else(|| String::from(""), |dt| dt.to_rfc3339()),
+                published: &feed.published.map_or(String::from(""), |dt| {
+                    clamp_future_date_to_now(&now, &dt).to_rfc3339()
+                }),
+                updated: &feed.updated.map_or(String::from(""), |dt| {
+                    clamp_future_date_to_now(&now, &dt).to_rfc3339()
+                }),
+                title: &feed
+                    .title
+                    .as_ref()
+                    .map_or_else(|| String::from(""), |title| String::from(&title.content)),
+                link: &feed
+                    .links
+                    .first()
+                    .map_or_else(|| String::from(""), |link| String::from(&link.href)),
+            },
+        ) {
+            Err(error) => Err(fetch_result.fetched_to_update_error(error)),
+            Ok(_) => Ok(fetch_result.fetched_to_updated()),
+        }
+    } else {
+        Ok(fetch_result)
     }
 }
 
@@ -239,71 +221,50 @@ fn update_entry(
     entry: &Entry,
 ) -> Result<(), diesel::result::Error> {
     use crate::models;
-
-    // TODO: skip upserting an entry if it already exists?
-
     let now = Utc::now();
-
-    let mut entry_published = String::from("");
-    if let Some(published_date) = entry.published {
-        entry_published = clamp_future_date_to_now(&now, &published_date).to_rfc3339();
-    };
-
-    let mut entry_updated = String::from("");
-    if let Some(updated_date) = entry.updated {
-        entry_updated = clamp_future_date_to_now(&now, &updated_date).to_rfc3339();
-    };
-
-    let mut entry_title = "";
-    if let Some(t) = &entry.title {
-        entry_title = &t.content;
-    }
-
-    let mut entry_link = "";
-    if !entry.links.is_empty() {
-        entry_link = &entry.links[0].href;
-    }
-
-    let mut entry_summary = "";
-    if let Some(x) = &entry.summary {
-        entry_summary = &x.content;
-    }
-
-    let mut entry_content = "";
-    if let Some(e_content) = &entry.content {
-        if let Some(e_body) = &e_content.body {
-            entry_content = e_body.as_ref();
-        }
-    }
-
-    // TODO: remove ID generation code for entry - feed-rs already does this?
-    let entry_id = format!(
-        "{:x}",
-        Sha256::new()
-            .chain(&entry.id)
-            .chain(&entry_title)
-            .chain(&entry_link)
-            .finalize()
-    );
-
-    let entry_json = match serde_json::to_string(&entry) {
-        Ok(json) => json,
-        Err(_) => String::from(""),
-    };
 
     upsert_entry(
         &conn,
         &models::EntryUpsert {
-            id: &entry_id,
-            feed_id: &parent_feed_id,
-            json: &entry_json,
-            title: &entry_title,
-            link: &entry_link,
-            summary: &entry_summary,
-            content: &entry_content,
-            published: &entry_published,
-            updated: &entry_updated,
+            // TODO: make this update skip optional?
+            skip_update: true,
             now: &now.to_rfc3339(),
+            id: &format!(
+                "{:x}",
+                Sha256::new()
+                    .chain(&parent_feed_id)
+                    .chain(&entry.id)
+                    .finalize()
+            ),
+            feed_id: &parent_feed_id,
+            json: &serde_json::to_string(&entry).unwrap_or_else(|_| String::from("")),
+            published: &entry.published.map_or(String::from(""), |dt| {
+                clamp_future_date_to_now(&now, &dt).to_rfc3339()
+            }),
+            updated: &entry.updated.map_or(String::from(""), |dt| {
+                clamp_future_date_to_now(&now, &dt).to_rfc3339()
+            }),
+            title: &entry
+                .title
+                .as_ref()
+                .map_or_else(|| String::from(""), |title| String::from(&title.content)),
+            link: &entry
+                .links
+                .first()
+                .map_or_else(|| String::from(""), |link| String::from(&link.href)),
+            summary: &entry.summary.as_ref().map_or_else(
+                || String::from(""),
+                |summary| String::from(&summary.content),
+            ),
+            content: &entry.content.as_ref().map_or_else(
+                || String::from(""),
+                |content| {
+                    content
+                        .body
+                        .as_ref()
+                        .map_or_else(|| String::from(""), ToString::to_string)
+                },
+            ),
         },
     )?;
     Ok(())

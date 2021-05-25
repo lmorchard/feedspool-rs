@@ -124,20 +124,22 @@ pub fn upsert_entry(
 
     if entry_exists {
         log::trace!("Entry exists {}", &upsert.id);
-        diesel::update(entries)
-            .filter(id.eq(&upsert.id))
-            .set(models::EntryUpdate {
-                defunct: Some(false),
-                json: Some(&upsert.json),
-                title: Some(&upsert.title),
-                link: Some(&upsert.link),
-                summary: Some(&upsert.summary),
-                content: Some(&upsert.content),
-                published: Some(&upsert.published),
-                updated: Some(&upsert.updated),
-                modified_at: Some(&upsert.now),
-            })
-            .execute(conn)?;
+        if !&upsert.skip_update {
+            diesel::update(entries)
+                .filter(id.eq(&upsert.id))
+                .set(models::EntryUpdate {
+                    defunct: Some(false),
+                    json: Some(&upsert.json),
+                    title: Some(&upsert.title),
+                    link: Some(&upsert.link),
+                    summary: Some(&upsert.summary),
+                    content: Some(&upsert.content),
+                    published: Some(&upsert.published),
+                    updated: Some(&upsert.updated),
+                    modified_at: Some(&upsert.now),
+                })
+                .execute(conn)?;
+        }
     } else {
         log::trace!("Entry new {}", &upsert.id);
         diesel::insert_into(entries)

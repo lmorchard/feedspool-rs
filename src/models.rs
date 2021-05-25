@@ -22,6 +22,7 @@ pub struct Entry {
 }
 
 pub struct EntryUpsert<'a> {
+    pub skip_update: bool,
     pub id: &'a str,
     pub feed_id: &'a str,
     pub json: &'a str,
