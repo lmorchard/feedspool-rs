@@ -84,6 +84,7 @@ pub fn upsert_feed(
                 published: Some(&upsert.published),
                 updated: Some(&upsert.updated),
                 modified_at: Some(&upsert.now),
+                last_entry_published: Some(&upsert.last_entry_published),
             })
             .execute(conn)?;
     } else {
@@ -98,6 +99,7 @@ pub fn upsert_feed(
                 published: &upsert.published,
                 created_at: &upsert.now,
                 modified_at: &upsert.now,
+                last_entry_published: &upsert.last_entry_published,
             })
             .execute(conn)?;
     }

@@ -20,13 +20,15 @@ impl RootQuery {
         since: Option<DateTime<Utc>>,
         pagination: Option<Pagination>,
     ) -> FieldResult<Vec<models::Feed>> {
-        use crate::schema::feeds::dsl::{feeds, published};
+        use crate::schema::feeds::dsl::{feeds, last_entry_published};
         let conn = context.pool.get()?;
         let mut query = feeds.into_boxed();
         if let Some(since) = since {
-            query = query.filter(published.gt(since.to_rfc3339()));
+            query = query.filter(last_entry_published.gt(since.to_rfc3339()));
         }
-        query = query.paginate(pagination).order(published.desc());
+        query = query
+            .paginate(pagination)
+            .order(last_entry_published.desc());
         Ok(query.load::<models::Feed>(&conn)?)
     }
 
@@ -135,6 +137,9 @@ impl models::Feed {
     fn updated(&self) -> &Option<String> {
         &self.updated
     }
+    fn last_entry_published(&self) -> &Option<String> {
+        &self.last_entry_published
+    }
     // TODO: move the DB bits of this into the db module
     fn entries(
         &self,
@@ -159,7 +164,7 @@ impl models::Feed {
         since: Option<DateTime<Utc>>,
         pagination: Option<Pagination>,
     ) -> FieldResult<Vec<models::FeedHistory>> {
-        use crate::schema::feed_history::dsl::{feed_history, feed_id, created_at};
+        use crate::schema::feed_history::dsl::{created_at, feed_history, feed_id};
         let conn = context.pool.get()?;
         let mut query = feed_history.into_boxed();
         query = query.filter(feed_id.eq(&self.id));

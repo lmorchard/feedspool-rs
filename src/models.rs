@@ -115,6 +115,7 @@ pub struct Feed {
     pub link: Option<String>,
     pub json: Option<String>,
     pub updated: Option<String>,
+    pub last_entry_published: Option<String>,
 }
 
 pub struct FeedUpsert<'a> {
@@ -126,6 +127,7 @@ pub struct FeedUpsert<'a> {
     pub published: &'a str,
     pub updated: &'a str,
     pub now: &'a str,
+    pub last_entry_published: &'a str,
 }
 
 #[derive(Insertable)]
@@ -139,6 +141,7 @@ pub struct FeedNew<'a> {
     pub title: &'a str,
     pub link: &'a str,
     pub json: &'a str,
+    pub last_entry_published: &'a str,
 }
 
 #[derive(AsChangeset)]
@@ -151,4 +154,5 @@ pub struct FeedUpdate<'a> {
     pub title: Option<&'a str>,
     pub link: Option<&'a str>,
     pub json: Option<&'a str>,
+    pub last_entry_published: Option<&'a str>,
 }

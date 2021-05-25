@@ -193,9 +193,19 @@ fn update_feed(
                 Ok(json) => json,
                 Err(_) => String::from(""),
             };
+
+            let mut last_entry_published: Option<DateTime<Utc>> = None;
+
             for entry in &feed.entries {
                 if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
                     return Err(fetch_result.fetched_to_update_error(error));
+                }
+                if let Some(entry_published) = &entry.published {
+                    if last_entry_published.is_none()
+                        || entry_published > last_entry_published.as_ref().unwrap()
+                    {
+                        last_entry_published.replace(entry_published.clone());
+                    }
                 }
             }
 
@@ -210,6 +220,8 @@ fn update_feed(
                     published: &feed_published,
                     updated: &feed_updated,
                     now: &now.to_rfc3339(),
+                    last_entry_published: &last_entry_published
+                        .map_or(String::from(""), |dt| dt.to_rfc3339()),
                 },
             ) {
                 return Err(fetch_result.fetched_to_update_error(error));

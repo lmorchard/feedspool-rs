@@ -44,6 +44,7 @@ table! {
         link -> Nullable<Text>,
         json -> Nullable<Text>,
         updated -> Nullable<Text>,
+        last_entry_published -> Nullable<Text>,
     }
 }
 
