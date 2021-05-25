@@ -264,6 +264,7 @@ fn update_entry(
         }
     }
 
+    // TODO: remove ID generation code for entry - feed-rs already does this?
     let entry_id = format!(
         "{:x}",
         Sha256::new()
