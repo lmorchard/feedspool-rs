@@ -26,7 +26,8 @@ pub async fn execute(matches: &ArgMatches, config: &config::Config) -> Result<()
     let concurrency_limit = config.get::<usize>("fetch_concurrency_limit")?;
     let min_fetch_period = Duration::from_secs(config.get("fetch_min_fetch_period")?);
     let request_timeout = Duration::from_secs(config.get("fetch_request_timeout")?);
-    let fetch_retain_src = config.get::<bool>("fetch_retain_src")?;
+    let retain_src = config.get("fetch_retain_src")?;
+    let skip_entry_update = config.get("fetch_skip_entry_update")?;
 
     let feeds_filename = match matches.value_of("feeds") {
         Some(filename) => String::from(filename),
@@ -46,7 +47,8 @@ pub async fn execute(matches: &ArgMatches, config: &config::Config) -> Result<()
                     &url,
                     request_timeout,
                     min_fetch_period,
-                    fetch_retain_src,
+                    retain_src,
+                    skip_entry_update,
                 )
                 .await
                 {

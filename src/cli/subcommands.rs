@@ -17,7 +17,7 @@ pub fn setup(app: App<'static>) -> App<'static> {
 }
 
 pub async fn execute(config: &config::Config, app_m: ArgMatches) -> Result<(), Box<dyn Error>> {
-    // TODO: selectively skip setting up DB for certain commands?
+    // TODO: selectively skip setting up DB for certain commands? use a lazy_static DB pool?
     feedspool::db::setup(&config)?;
     match app_m.subcommand() {
         Some((fetch::NAME, sub_m)) => fetch::execute(&sub_m, &config).await,

@@ -25,9 +25,18 @@ pub async fn poll_one_feed(
     request_timeout: Duration,
     min_fetch_period: Duration,
     retain_src: bool,
+    skip_entry_update: bool,
 ) -> Result<FeedPollResult, FeedPollError> {
     // TODO: this wraps another function so I can try/catch an Err() from any of the ? operators - is there a better way?
-    match _poll_one_feed(conn, url, request_timeout, min_fetch_period).await {
+    match _poll_one_feed(
+        conn,
+        url,
+        request_timeout,
+        min_fetch_period,
+        skip_entry_update,
+    )
+    .await
+    {
         Ok(fetch_result) => {
             if let FeedPollResult::Updated { fetch, .. }
             | FeedPollResult::NotModified { fetch, .. } = &fetch_result
@@ -48,6 +57,7 @@ async fn _poll_one_feed(
     url: &str,
     request_timeout: Duration,
     min_fetch_period: Duration,
+    skip_entry_update: bool,
 ) -> Result<FeedPollResult, FeedPollError> {
     if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
         log::trace!("Skipped fetch for {} - min fetch period", &url);
@@ -55,7 +65,7 @@ async fn _poll_one_feed(
     }
     let last_get_conditions = find_last_get_conditions(&conn, &url);
     let mut fetch_result = fetch_feed(url, request_timeout, last_get_conditions).await?;
-    fetch_result = update_feed(&conn, fetch_result)?;
+    fetch_result = update_feed(&conn, fetch_result, skip_entry_update)?;
     Ok(fetch_result)
 }
 
@@ -149,6 +159,7 @@ pub async fn fetch_feed(
     }
 }
 
+// TODO: pinboard.in feeds seem to produce dates in the future - why? any fix?
 fn clamp_future_date_to_now<'a>(
     now: &'a DateTime<Utc>,
     thedate: &'a DateTime<Utc>,
@@ -162,6 +173,7 @@ fn clamp_future_date_to_now<'a>(
 fn update_feed(
     conn: &SqliteConnection,
     fetch_result: FeedPollResult,
+    skip_entry_update: bool,
 ) -> Result<FeedPollResult, FeedPollError> {
     use crate::models;
 
@@ -169,8 +181,9 @@ fn update_feed(
         let now = Utc::now();
 
         let mut last_entry_published: Option<DateTime<Utc>> = None;
+        // TODO: Track seen entry IDs to determine defunct entries for later purge
         for entry in &feed.entries {
-            if let Err(error) = update_entry(&conn, &fetch.id, &entry) {
+            if let Err(error) = update_entry(&conn, &fetch.id, &entry, skip_entry_update) {
                 return Err(fetch_result.fetched_to_update_error(error));
             }
             if let Some(entry_published) = &entry.published {
@@ -220,6 +233,7 @@ fn update_entry(
     conn: &SqliteConnection,
     parent_feed_id: &str,
     entry: &Entry,
+    skip_update: bool,
 ) -> Result<(), diesel::result::Error> {
     use crate::models;
     let now = Utc::now();
@@ -227,8 +241,7 @@ fn update_entry(
     upsert_entry(
         &conn,
         &models::EntryUpsert {
-            // TODO: make this update skip optional?
-            skip_update: true,
+            skip_update,
             now: &now.to_rfc3339(),
             id: &format!(
                 "{:x}",
@@ -257,6 +270,7 @@ fn update_entry(
                 || String::from(""),
                 |summary| String::from(&summary.content),
             ),
+            // TODO: this is kinda ugly
             content: &entry.content.as_ref().map_or_else(
                 || String::from(""),
                 |content| {
