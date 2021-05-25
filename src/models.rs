@@ -68,14 +68,17 @@ pub struct EntryUpdate<'a> {
 #[derive(Queryable, PartialEq, Debug, Serialize, Deserialize, GraphQLObject)]
 #[graphql(description = "An event in feed fetch history")]
 pub struct FeedHistory {
-    pub id: String,
-    pub feed_id: String,
-    pub created_at: String,
-    pub modified_at: String,
-    pub src: String,
-    pub status: String,
-    pub is_error: bool,
-    pub error_text: String,
+    pub id: Option<String>,
+    pub feed_id: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub src: Option<String>,
+    pub status: Option<String>,
+    pub etag: Option<String>,
+    pub last_modified: Option<String>,
+    pub json: Option<String>,
+    pub is_error: Option<bool>,
+    pub error_text: Option<String>,
 }
 
 #[derive(Insertable)]

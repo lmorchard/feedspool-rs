@@ -152,4 +152,21 @@ impl models::Feed {
         query = query.paginate(pagination).order(published.desc());
         Ok(query.load::<models::Entry>(&conn)?)
     }
+    // TODO: move the DB bits of this into the db module
+    fn history(
+        &self,
+        context: &Context,
+        since: Option<DateTime<Utc>>,
+        pagination: Option<Pagination>,
+    ) -> FieldResult<Vec<models::FeedHistory>> {
+        use crate::schema::feed_history::dsl::{feed_history, feed_id, created_at};
+        let conn = context.pool.get()?;
+        let mut query = feed_history.into_boxed();
+        query = query.filter(feed_id.eq(&self.id));
+        if let Some(since) = since {
+            query = query.filter(created_at.gt(since.to_rfc3339()));
+        }
+        query = query.paginate(pagination).order(created_at.desc());
+        Ok(query.load::<models::FeedHistory>(&conn)?)
+    }
 }
