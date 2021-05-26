@@ -27,16 +27,17 @@ pub async fn poll_one_feed(
     retain_src: bool,
     skip_entry_update: bool,
 ) -> Result<FeedPollResult, FeedPollError> {
-    // TODO: this wraps another function so I can try/catch an Err() from any of the ? operators - is there a better way?
-    match _poll_one_feed(
-        conn,
-        url,
-        request_timeout,
-        min_fetch_period,
-        skip_entry_update,
-    )
-    .await
-    {
+    let fetch_result = async {
+        if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
+            log::trace!("Skipped fetch for {} - min fetch period", &url);
+            return Ok(FeedPollResult::Skipped);
+        }
+        let last_get_conditions = find_last_get_conditions(&conn, &url);
+        let mut fetch_result = fetch_feed(url, request_timeout, last_get_conditions).await?;
+        fetch_result = update_feed(&conn, fetch_result, skip_entry_update)?;
+        Ok(fetch_result)
+    };
+    match fetch_result.await {
         Ok(fetch_result) => {
             if let FeedPollResult::Updated { fetch, .. }
             | FeedPollResult::NotModified { fetch, .. } = &fetch_result
@@ -50,23 +51,6 @@ pub async fn poll_one_feed(
             Err(error)
         }
     }
-}
-
-async fn _poll_one_feed(
-    conn: &SqliteConnection,
-    url: &str,
-    request_timeout: Duration,
-    min_fetch_period: Duration,
-    skip_entry_update: bool,
-) -> Result<FeedPollResult, FeedPollError> {
-    if was_feed_recently_fetched(&conn, &url, min_fetch_period)? {
-        log::trace!("Skipped fetch for {} - min fetch period", &url);
-        return Ok(FeedPollResult::Skipped);
-    }
-    let last_get_conditions = find_last_get_conditions(&conn, &url);
-    let mut fetch_result = fetch_feed(url, request_timeout, last_get_conditions).await?;
-    fetch_result = update_feed(&conn, fetch_result, skip_entry_update)?;
-    Ok(fetch_result)
 }
 
 fn was_feed_recently_fetched(
@@ -270,7 +254,7 @@ fn update_entry(
                 || String::from(""),
                 |summary| String::from(&summary.content),
             ),
-            // TODO: this is kinda ugly
+            // maybe I've code-golfed this too far?
             content: &entry.content.as_ref().map_or_else(
                 || String::from(""),
                 |content| {
