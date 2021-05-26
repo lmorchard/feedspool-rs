@@ -6,13 +6,14 @@ use diesel::sqlite::SqliteConnection;
 use feed_rs::model::Entry;
 use feed_rs::parser;
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::time::Duration;
 
 pub mod result;
 
 use crate::db::{
     feed_id_from_url, find_last_fetch_time, find_last_get_conditions, insert_feed_history,
-    insert_feed_history_error, upsert_entry, upsert_feed,
+    insert_feed_history_error, mark_old_entries_defunct, upsert_entry, upsert_feed,
 };
 use result::{ConditionalGetData, FeedFetchResult, FeedPollError, FeedPollResult};
 
@@ -59,10 +60,8 @@ fn was_feed_recently_fetched(
     min_fetch_period: Duration,
 ) -> Result<bool, FeedPollError> {
     let now = Utc::now();
-    let min_fetch_duration = match chrono::Duration::from_std(min_fetch_period) {
-        Err(error) => Err(FeedPollError::FetchTimeError(error)),
-        Ok(val) => Ok(val),
-    }?;
+    let min_fetch_duration =
+        chrono::Duration::from_std(min_fetch_period).map_err(FeedPollError::FetchTimeError)?;
     let last_fetch_time = find_last_fetch_time(&conn, &url);
     if let Some(last_fetch_time) = last_fetch_time {
         if let Ok(last_fetch_time) = chrono::DateTime::parse_from_rfc3339(&last_fetch_time) {
@@ -164,12 +163,13 @@ fn update_feed(
     if let FeedPollResult::Fetched { feed, fetch, .. } = &fetch_result {
         let now = Utc::now();
 
+        let mut seen_entry_ids = HashSet::new();
         let mut last_entry_published: Option<DateTime<Utc>> = None;
-        // TODO: Track seen entry IDs to determine defunct entries for later purge
         for entry in &feed.entries {
-            if let Err(error) = update_entry(&conn, &fetch.id, &entry, skip_entry_update) {
-                return Err(fetch_result.fetched_to_update_error(error));
-            }
+            match update_entry(&conn, &fetch.id, &entry, skip_entry_update) {
+                Ok(entry_id) => seen_entry_ids.insert(entry_id),
+                Err(error) => return Err(fetch_result.fetched_to_update_error(error)),
+            };
             if let Some(entry_published) = &entry.published {
                 let entry_published = clamp_future_date_to_now(&now, entry_published);
                 if last_entry_published.is_none()
@@ -178,6 +178,10 @@ fn update_feed(
                     last_entry_published.replace(*entry_published);
                 }
             }
+        }
+
+        if let Err(error) = mark_old_entries_defunct(&conn, &fetch.id, seen_entry_ids) {
+            return Err(fetch_result.fetched_to_update_error(error));
         }
 
         match upsert_feed(
@@ -205,6 +209,7 @@ fn update_feed(
                     .map_or_else(|| String::from(""), |link| String::from(&link.href)),
             },
         ) {
+            // TODO: would like to use map_or_else here, but get issues around borrowing
             Err(error) => Err(fetch_result.fetched_to_update_error(error)),
             Ok(_) => Ok(fetch_result.fetched_to_updated()),
         }
@@ -218,22 +223,22 @@ fn update_entry(
     parent_feed_id: &str,
     entry: &Entry,
     skip_update: bool,
-) -> Result<(), diesel::result::Error> {
+) -> Result<String, diesel::result::Error> {
     use crate::models;
     let now = Utc::now();
-
+    let id = format!(
+        "{:x}",
+        Sha256::new()
+            .chain(&parent_feed_id)
+            .chain(&entry.id)
+            .finalize()
+    );
     upsert_entry(
         &conn,
         &models::EntryUpsert {
             skip_update,
             now: &now.to_rfc3339(),
-            id: &format!(
-                "{:x}",
-                Sha256::new()
-                    .chain(&parent_feed_id)
-                    .chain(&entry.id)
-                    .finalize()
-            ),
+            id: &id,
             feed_id: &parent_feed_id,
             json: &serde_json::to_string(&entry).unwrap_or_else(|_| String::from("")),
             published: &entry.published.map_or(String::from(""), |dt| {
@@ -266,5 +271,5 @@ fn update_entry(
             ),
         },
     )?;
-    Ok(())
+    Ok(id)
 }

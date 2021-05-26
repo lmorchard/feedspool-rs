@@ -1,7 +1,9 @@
 use chrono::prelude::*;
 use diesel::prelude::*;
 use diesel_migrations::embed_migrations;
+use std::collections::HashSet;
 use std::error::Error;
+use std::hash::BuildHasher;
 
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -159,6 +161,21 @@ pub fn upsert_entry(
             .execute(conn)?;
     }
     Ok(())
+}
+
+/// # Errors
+///
+/// Returns `diesel::result::Error` for any DB failure
+pub fn mark_old_entries_defunct<S: BuildHasher>(
+    conn: &SqliteConnection,
+    parent_feed_id: &str,
+    seen_entry_ids: HashSet<String, S>,
+) -> Result<usize, diesel::result::Error> {
+    use crate::schema::entries::dsl::{defunct, entries, feed_id, id};
+    diesel::update(entries)
+        .filter(feed_id.eq(parent_feed_id).and(id.ne_all(seen_entry_ids)))
+        .set(defunct.eq(true))
+        .execute(conn)
 }
 
 /// # Errors
