@@ -37,6 +37,7 @@ pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(
         let ctx = ctx.clone();
         let staticfiles = staticfiles.clone();
 
+        // TODO: break down this indentation pyramid into separate functions?
         async {
             Ok::<_, hyper::Error>(service_fn(move |req| {
                 let root_node = root_node.clone();

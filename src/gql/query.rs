@@ -14,7 +14,7 @@ impl RootQuery {
         "1.0"
     }
 
-    // TODO: move the DB bits of this into the db module
+    // TODO: figure out how to parameterize this paginate / since / order code and move into the db module
     fn feeds(
         context: &Context,
         since: Option<DateTime<Utc>>,
@@ -32,7 +32,6 @@ impl RootQuery {
         Ok(query.load::<models::Feed>(&conn)?)
     }
 
-    // TODO: move the DB bits of this into the db module
     fn entries(
         context: &Context,
         since: Option<DateTime<Utc>>,
@@ -140,7 +139,7 @@ impl models::Feed {
     fn last_entry_published(&self) -> &Option<String> {
         &self.last_entry_published
     }
-    // TODO: move the DB bits of this into the db module
+    // TODO: is there any way to optimize this as a LEFT JOIN? check out juniper look-ahead
     fn entries(
         &self,
         context: &Context,
@@ -157,7 +156,6 @@ impl models::Feed {
         query = query.paginate(pagination).order(published.desc());
         Ok(query.load::<models::Entry>(&conn)?)
     }
-    // TODO: move the DB bits of this into the db module
     fn history(
         &self,
         context: &Context,

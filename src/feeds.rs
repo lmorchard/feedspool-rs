@@ -209,7 +209,6 @@ fn update_feed(
                     .map_or_else(|| String::from(""), |link| String::from(&link.href)),
             },
         ) {
-            // TODO: would like to use map_or_else here, but get issues around borrowing
             Err(error) => Err(fetch_result.fetched_to_update_error(error)),
             Ok(_) => Ok(fetch_result.fetched_to_updated()),
         }

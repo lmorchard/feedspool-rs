@@ -1,7 +1,6 @@
 use diesel::query_dsl::methods::{LimitDsl, OffsetDsl};
 use juniper::GraphQLInputObject;
 
-// TODO: any way to derive or define this in the gql submodule?
 #[derive(GraphQLInputObject)]
 pub struct Pagination {
     pub take: Option<i32>,

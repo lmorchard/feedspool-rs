@@ -36,8 +36,7 @@ impl FeedPollResult {
     pub fn fetched_to_updated(self) -> FeedPollResult {
         match self {
             Self::Fetched { fetch, feed } => Self::Updated { fetch, feed },
-            // TODO: find a non-panic way to handle this?
-            _ => panic!("fetched_to_updated {:?}", &self),
+            _ => panic!("expected FeedPollResult::Fetched, got {:?}", self),
         }
     }
 
@@ -48,8 +47,7 @@ impl FeedPollResult {
     pub fn fetched_to_update_error(self, error: diesel::result::Error) -> FeedPollError {
         match self {
             Self::Fetched { fetch, feed } => FeedPollError::UpdateError { fetch, feed, error },
-            // TODO: find a non-panic way to handle this?
-            _ => panic!("fetched_to_update_error {:?}", self),
+            _ => panic!("expected FeedPollResult::Fetched, got {:?}", self),
         }
     }
 }
@@ -77,7 +75,6 @@ pub enum FeedPollError {
 impl FeedPollError {}
 impl fmt::Display for FeedPollError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: better formatting for these errors
         write!(f, "{:?}", &self)
     }
 }

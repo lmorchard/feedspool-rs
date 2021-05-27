@@ -45,7 +45,7 @@ pub async fn execute(_matches: &ArgMatches, config: &config::Config) -> Result<(
     let conn = db::connect(&config)?;
 
     let now = Utc::now();
-    let since_datetime = now - chrono::Duration::days(30);
+    let since_datetime = now - chrono::Duration::days(7);
     let links_count_threshold = 3;
 
     let entries_by_id = entries::table
@@ -163,6 +163,8 @@ fn handle_entry(row: (models::Entry, Option<models::Feed>)) -> FeedEntry {
                         }
                     }
                     link_url.set_fragment(None);
+                    // TODO: any other link normalization stuff here? e.g. stripping google analytics queries? deref short URLs?
+                    // Seemed like a good idea, but this breaks YouTube links for one
                     //link_url.set_query(None);
                     links.insert(String::from(link_url));
                 }
