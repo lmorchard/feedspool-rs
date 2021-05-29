@@ -1,16 +1,8 @@
 export const $ = (sel, context = document.body) =>
-  context.querySelector(sel);
+  typeof sel === "string" ? context.querySelector(sel) : sel;
 
 export const $$ = (sel, context = document) =>
   Array.from(context.querySelectorAll(sel));
-
-export function createElement(name, props = {}) {
-  const el = document.createElement(name);
-  for (let name in props) {
-    el[name] = props[name];
-  }
-  return el;
-}
 
 export function clearChildren(sel, context = document.body) {
   let parentNode = $(sel, context);
@@ -26,6 +18,36 @@ export function replaceChildren(sel, childNodes, context = document.body) {
     parentNode.appendChild(node);
   }
   return parentNode;
+}
+
+export function updateElements(changes = [], context = document.body) {
+  for (const sel in changes) {
+    for (const el of $$(sel, context)) {
+      updateElement(el, changes[sel]);
+    }
+  }
+}
+
+export function updateElement(el, changeSet) {
+  if (typeof changeSet === "function") {
+    changeSet(el);
+  } else {
+    for (const name in changeSet) {
+      const value = changeSet[name];
+      if (name.startsWith("@")) {
+        el.setAttribute(name.substring(1), value);
+      } if (name === "children") {
+        replaceChildren(el, value);
+      } else {
+        el[name] = value;
+      }
+    }
+  }
+  return el;
+}
+
+export function createElement(name, changeSet = {}) {
+  return updateElement(document.createElement(name), changeSet);
 }
 
 export function html(strings, ...values) {
@@ -83,5 +105,9 @@ export class BaseElement extends HTMLElement {
 
   replaceChildren(sel, childNodes) {
     return replaceChildren(sel, childNodes, this.shadowRoot);
+  }
+
+  updateElements(changes) {
+    return updateElements(changes, this.shadowRoot);
   }
 }

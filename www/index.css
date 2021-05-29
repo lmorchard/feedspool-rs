@@ -1,4 +1,57 @@
-html, body {
-  border: 0;
-  margin: 0;
+:root {
+  color-scheme: light dark; /* both supported */
+}
+
+body {
+  --page-bg-color: #eee;
+  --page-text-color: #000;
+  --header-bg-color: #fff;
+  --header-border-color: #aaa;
+  --box-shadow-color: rgba(0, 0, 0, 0.4);
+  --nav-button-color: rgba(255, 255, 255, 1.0);
+  --nav-button-bg-color: rgba(0, 0, 0, 0.5);
+  --nav-button-hover-bg-color: rgba(0, 0, 0, 0.7);
+  --text-shadow-color: #000;
+  --item-text-color: #000;
+  --item-bg-color: #fff;
+  --item-border-color: #aaa;
+  --item-text-bg-color: rgba(255, 255, 255, 0.3);
+  --title-color: rgba(0, 0, 0, 1.0);
+  --title-bg-color: rgba(255, 255, 255, 0.5);
+  --title-has-thumb-color: rgba(255, 255, 255, 1.0);
+  --title-has-thumb-bg-color: rgba(0, 0, 0, 0.5);
+  --options-panel-bg-color: rgba(0, 0, 0, 0.8);
+  --options-panel-button-bg-color: rgba(255, 255, 255, 0.8);
+  --options-panel-button-hover-bg-color: rgba(255, 255, 255, 1.0);
+
+  background-color: var(--page-bg-color);
+  color: var(--page-text-color);
+  font-family: sans-serif;
+  font-size: 14px;
+  padding: 1em 1em 1em 1em;
+  margin: 0.5em;
+}
+
+body.dark-theme {
+  --page-bg-color: #333;
+  --page-text-color: rgba(224, 224, 224, 1.0);
+  --header-bg-color: #222;
+  --header-border-color: #333;
+  --box-shadow-color: rgba(32, 32, 32, 0.4);
+  --nav-button-color: rgba(0, 0, 0, 1.0);
+  --nav-button-bg-color: rgba(255, 255, 255, 0.5);
+  --nav-button-hover-bg-color: rgba(255, 255, 255, 0.8);
+  --text-shadow-color: rgba(64, 64, 64, 0.4);
+  --item-text-color: rgba(224, 224, 224, 1.0);
+  --item-bg-color: rgba(32, 32, 32, 1.0);
+  --item-border-color: #222;
+  --item-text-bg-color: rgba(32, 32, 32, 0.3);
+  --title-color: rgba(224, 224, 224, 1.0);
+  --title-bg-color: rgba(32, 32, 32, 0.3);
+  --title-has-thumb-color: rgba(24,24,24, 1.0);
+  --title-has-thumb-bg-color: rgba(224, 224, 224, 0.7);
+  --options-panel-bg-color: rgba(255, 255, 255, 0.7);
+  --options-panel-button-color: rgba(255, 255, 255, 1.0);
+  --options-panel-button-bg-color: rgba(32, 32, 32, 0.7);
+  --options-panel-button-hover-bg-color: rgba(32, 32, 32, 0.9);
 }

@@ -1,13 +1,13 @@
-import { createElement } from "./dom.js";
-import { queryFetchFeeds } from "./gql.js";
-import "./components.js";
+import { createElement } from "./lib/dom.js";
+import { queryFetchFeeds } from "./lib/gql.js";
+import "./lib/components.js";
 
 async function main() {
   const now = Date.now();
-  const since = new Date(now - 1000 * 60 * 60 * 12);
+  const since = new Date(now - 1000 * 60 * 60 * 24);
   const result = await queryFetchFeeds({
-    takeFeeds: 100,
-    since: since.toISOString().replace(/Z$/, "+00:00"),
+    takeFeeds: 250,
+    since: since.toISOString()// .replace(/Z$/, "+00:00"),
   });
   document.body.append(
     createElement("feed-reader", {
